@@ -160,7 +160,7 @@ class ThreeShop {
     this.tryOnFocus = false;
     this.radius = 8.5;
     this.target = new THREE.Vector3(0, 1.25, 0);
-    this.actorZ = 0;
+    this.actorZ = 2.2;
     this.ready = false;
     this.setupLights();
     this.resize();
@@ -602,15 +602,12 @@ class ThreeShop {
     try {
       const template = await this.loadTemplate(characterModels[kind]);
       if (this.character) this.scene.remove(this.character);
-      const characterRoot = new THREE.Group();
-      characterRoot.name = "CharacterRoot";
-      characterRoot.position.set(0, 0, 0);
-      characterRoot.rotation.set(0, 0, 0);
-      characterRoot.scale.set(1, 1, 1);
-      const characterModel = this.clone(template);
-      this.fitHeight(characterModel, 3.65);
-      characterRoot.add(characterModel);
-      this.character = characterRoot;
+      this.character = this.clone(template);
+      this.character.rotation.x = 0;
+      this.character.rotation.y = 0;
+      this.fitHeight(this.character, 3.65);
+      this.character.position.y += -1.36;
+      this.character.position.z += this.actorZ;
       this.scene.add(this.character);
       this.character.add(this.auraLight);
       this.auraLight.position.set(0, 1.7, 0.45);
@@ -628,14 +625,14 @@ class ThreeShop {
   setStage(stageIndex) {
     this.mode = "shop";
     const female = this.characterKind === "female";
-    this.target.set(0, female ? 0.22 : 1.825, this.actorZ);
+    this.target.set(0, female ? 0.22 : 0.55, this.actorZ);
     this.radius = (female ? 8.6 : 7.8) - stageIndex * 0.2;
   }
 
   setPhotoMode(enabled) {
     this.mode = enabled ? "photo" : "shop";
     const female = this.characterKind === "female";
-    this.target.set(0, female ? 0.22 : 1.825, this.actorZ);
+    this.target.set(0, female ? 0.22 : 0.55, this.actorZ);
     this.radius = enabled ? (female ? 6.9 : 6.3) : (female ? 8.6 : 7.8);
   }
 
