@@ -155,7 +155,7 @@ class ThreeShop {
     this.characterPreviewSize = { width: 0, height: 0 };
     this.characterPositionOffset = { x: 0, y: 0, z: 0 };
     this.calibrationPresets = this.readCalibrationPresets();
-    this.characterPositionBase = new THREE.Vector3();
+    this.bodyOffsetGroup = null;
     this.rotatePointer = null;
     this.preparationPromises = new Map();
     this.mode = "shop";
@@ -607,16 +607,24 @@ class ThreeShop {
     try {
       const template = await this.loadTemplate(characterModels[kind]);
       if (this.character) this.scene.remove(this.character);
-      this.character = this.clone(template);
-      this.character.rotation.x = 0;
-      this.character.rotation.y = 0;
-      this.fitHeight(this.character, 3.65);
-      this.character.position.y += -1.36;
-      this.character.position.z += this.actorZ;
-      this.characterPositionBase.copy(this.character.position);
+      const fittedModel = this.clone(template);
+      fittedModel.rotation.set(0, 0, 0);
+      this.fitHeight(fittedModel, 3.65);
+      const characterRoot = new THREE.Group();
+      characterRoot.position.set(fittedModel.position.x, fittedModel.position.y - 1.36, fittedModel.position.z + this.actorZ);
+      characterRoot.rotation.copy(fittedModel.rotation);
+      characterRoot.scale.copy(fittedModel.scale);
+      fittedModel.position.set(0, 0, 0);
+      fittedModel.rotation.set(0, 0, 0);
+      fittedModel.scale.set(1, 1, 1);
+      this.bodyOffsetGroup = new THREE.Group();
+      this.bodyOffsetGroup.name = "CharacterBodyRelativeToClothes";
+      this.bodyOffsetGroup.add(fittedModel);
+      characterRoot.add(this.bodyOffsetGroup);
+      this.character = characterRoot;
       this.applyCharacterPositionOffset();
       this.scene.add(this.character);
-      this.character.add(this.auraLight);
+      this.bodyOffsetGroup.add(this.auraLight);
       this.auraLight.position.set(0, 1.7, 0.45);
       this.character.add(this.outfitGroup);
       this.outfitGroup.position.set(0, 0, 0);
@@ -726,7 +734,7 @@ class ThreeShop {
     aura.name = `${style.name.replaceAll(" ", "_")}_Particles`;
     aura.frustumCulled = false;
     aura.userData = { style, particles, glowTexture };
-    this.character.add(aura);
+    (this.bodyOffsetGroup || this.character).add(aura);
     this.aura = aura;
     this.auraLight.color.setHex(style.light);
     this.auraLight.intensity = 2.4;
@@ -785,11 +793,12 @@ class ThreeShop {
       Number.isFinite(position?.[axis]) ? position[axis] : 0,
     ]));
     this.characterPositionOffset = next;
-    if (this.character) {
-      this.character.position.set(
-        this.characterPositionBase.x + next.x,
-        this.characterPositionBase.y + next.y,
-        this.characterPositionBase.z + next.z,
+    if (this.character && this.bodyOffsetGroup) {
+      const scale = this.character.getWorldScale(new THREE.Vector3());
+      this.bodyOffsetGroup.position.set(
+        next.x / (scale.x || 1),
+        next.y / (scale.y || 1),
+        next.z / (scale.z || 1),
       );
       this.character.updateMatrixWorld(true);
     }
@@ -891,6 +900,11 @@ class ThreeShop {
     this.character.rotation.y = 0;
     this.character.updateMatrixWorld(true);
     const characterBox = new THREE.Box3().setFromObject(this.character);
+    if (this.bodyOffsetGroup) {
+      const rootPosition = this.character.getWorldPosition(new THREE.Vector3());
+      const bodyPosition = this.bodyOffsetGroup.getWorldPosition(new THREE.Vector3());
+      characterBox.translate(rootPosition.sub(bodyPosition));
+    }
     const characterSize = characterBox.getSize(new THREE.Vector3());
     const characterCenter = characterBox.getCenter(new THREE.Vector3());
     const characterScale = this.character.getWorldScale(new THREE.Vector3()).y || 1;
