@@ -24,6 +24,12 @@ Deploy from a branch → main → / (root)
 
 Three.js được nạp từ CDN nên GitHub Pages cần Internet ở lần chạy đầu.
 
+## Fit workspace và preset quần áo
+
+Trong shop, nhấn **FIT WORKSPACE** để xem từng model quần áo trên Panda hoặc Cvrix. Chỉnh Position offset, Scale multiplier và Rotation theo từng trục; các giá trị được tính tương đối với bước tự căn và cập nhật trực tiếp trên preview. Nhấn **Apply & save** để áp dụng và lưu preset vào trình duyệt. Preset được tự động dùng lại khi món đồ xuất hiện trong game.
+
+**Download preset** xuất toàn bộ transform đã Apply thành `thrifting101-fit-preset.json`. Dùng **Import preset** để nạp JSON trở lại workspace. Preset tách theo nhân vật và ID quần áo.
+
 ## Gameplay
 
 - Chọn Panda hoặc Cvrix.

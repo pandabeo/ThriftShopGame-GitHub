@@ -146,6 +146,9 @@ class ThreeShop {
     this.outfitGroup = new THREE.Group();
     this.outfitBuildId = 0;
     this.outfitItems = [];
+    this.clothingObjects = new Map();
+    this.clothingBases = new Map();
+    this.calibrationPresets = this.readCalibrationPresets();
     this.rotatePointer = null;
     this.environmentFiles = [
       ["cashier", "Furniture/cashier.fbx", 2.5, [4.2, -1.38, -3.4], Math.PI],
@@ -531,7 +534,80 @@ class ThreeShop {
 
   setOutfit(items = []) {
     this.outfitItems = items;
-    this.rebuildOutfit();
+    return this.rebuildOutfit();
+  }
+
+  readCalibrationPresets() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem("thrifting101-fit-presets") || "{}");
+      return parsed && parsed.version === 2 && parsed.items ? parsed.items : {};
+    } catch { return {}; }
+  }
+
+  clothingIds() {
+    return Object.values(itemModels).flatMap((group) => Object.keys(group));
+  }
+
+  setCalibrationItem(id) {
+    const slot = this.itemSlot(id);
+    return this.setOutfit([{ id, name: id, tag: slot.toUpperCase() }]);
+  }
+
+  calibrationKey(id, kind = this.characterKind) { return `${kind}:${id}`; }
+
+  calibrationTransform(id) {
+    const object = this.clothingObjects.get(id);
+    const base = this.clothingBases.get(id);
+    if (!object || !base) return this.calibrationPresets[this.calibrationKey(id)] || null;
+    return {
+      position: { x: object.position.x - base.position.x, y: object.position.y - base.position.y, z: object.position.z - base.position.z },
+      scale: { x: object.scale.x / base.scale.x, y: object.scale.y / base.scale.y, z: object.scale.z / base.scale.z },
+      rotation: { x: THREE.MathUtils.radToDeg(object.rotation.x - THREE.MathUtils.degToRad(base.rotation.x)), y: THREE.MathUtils.radToDeg(object.rotation.y - THREE.MathUtils.degToRad(base.rotation.y)), z: THREE.MathUtils.radToDeg(object.rotation.z - THREE.MathUtils.degToRad(base.rotation.z)) },
+    };
+  }
+
+  serializeTransform(object) {
+    return {
+      position: { x: object.position.x, y: object.position.y, z: object.position.z },
+      scale: { x: object.scale.x, y: object.scale.y, z: object.scale.z },
+      rotation: { x: THREE.MathUtils.radToDeg(object.rotation.x), y: THREE.MathUtils.radToDeg(object.rotation.y), z: THREE.MathUtils.radToDeg(object.rotation.z) },
+    };
+  }
+
+  updateCalibrationTransform(id, transform) {
+    const object = this.clothingObjects.get(id);
+    const base = this.clothingBases.get(id);
+    if (!object || !base) return false;
+    for (const axis of ["x", "y", "z"]) {
+      if (Number.isFinite(transform.position?.[axis])) object.position[axis] = base.position[axis] + transform.position[axis];
+      if (Number.isFinite(transform.scale?.[axis])) object.scale[axis] = Math.max(0.01, base.scale[axis] * transform.scale[axis]);
+      if (Number.isFinite(transform.rotation?.[axis])) object.rotation[axis] = THREE.MathUtils.degToRad(base.rotation[axis] + transform.rotation[axis]);
+    }
+    return true;
+  }
+
+  applyCalibration(id) {
+    const transform = this.calibrationTransform(id);
+    if (!transform) return false;
+    this.calibrationPresets[this.calibrationKey(id)] = transform;
+    localStorage.setItem("thrifting101-fit-presets", JSON.stringify({ version: 2, items: this.calibrationPresets }));
+    return true;
+  }
+
+  importCalibrationPresets(data) {
+    if (!data || data.version !== 2 || !data.items || typeof data.items !== "object") throw new Error("File preset không đúng phiên bản workspace.");
+    const allowed = new Set(this.clothingIds());
+    for (const [key, value] of Object.entries(data.items)) {
+      const [kind, id] = key.split(":");
+      if (!["male", "female"].includes(kind) || !allowed.has(id)) continue;
+      if (!["position", "scale", "rotation"].every((part) => ["x", "y", "z"].every((axis) => Number.isFinite(value?.[part]?.[axis])))) continue;
+      this.calibrationPresets[key] = value;
+    }
+    localStorage.setItem("thrifting101-fit-presets", JSON.stringify({ version: 2, items: this.calibrationPresets }));
+  }
+
+  calibrationPresetFile() {
+    return { version: 2, app: "Thrifting 101 Fit Workspace", exportedAt: new Date().toISOString(), items: this.calibrationPresets };
   }
 
   itemSlot(id) {
@@ -551,6 +627,8 @@ class ThreeShop {
   async rebuildOutfit() {
     const buildId = ++this.outfitBuildId;
     while (this.outfitGroup.children.length) this.outfitGroup.remove(this.outfitGroup.children[0]);
+    this.clothingObjects.clear();
+    this.clothingBases.clear();
     if (!this.character) return;
 
     this.character.rotation.y = 0;
@@ -629,6 +707,10 @@ class ThreeShop {
             object.updateMatrixWorld(true);
           }
         }
+        this.clothingObjects.set(item.id, object);
+        this.clothingBases.set(item.id, this.serializeTransform(object));
+        const savedTransform = this.calibrationPresets[this.calibrationKey(item.id)];
+        if (savedTransform) this.updateCalibrationTransform(item.id, savedTransform);
       } catch (error) {
         console.warn(`3D clothing asset failed: ${path}`, error);
       }

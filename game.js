@@ -71,6 +71,7 @@ let dragState = null;
 let threeReady = false;
 let threeUiReady = false;
 let characterLoading = false;
+let workspaceOpen = false;
 
 const sounds = {
   menu: "SFX (1)/Menu BGM.mp3",
@@ -473,6 +474,106 @@ function togglePause(force) {
   $("#pauseModal").hidden = !paused;
 }
 
+function initializeFitWorkspace() {
+  const overlay = $("#fitWorkspace");
+  const viewport = $("#threeViewport");
+  const originalSlot = $("#threeViewportSlot");
+  const preview = $("#workspacePreview");
+  const characterSelect = $("#workspaceCharacter");
+  const itemSelect = $("#workspaceItem");
+  const status = $("#workspaceStatus");
+  const components = ["position", "scale", "rotation"];
+  const currentTransform = () => Object.fromEntries(components.map((part) => [part, Object.fromEntries(
+    [...document.querySelectorAll(`[data-axis="${part}"] input`)].map((input) => [input.dataset.component, Number(input.value)]),
+  )]));
+  const setControls = (transform) => {
+    if (!transform) return;
+    for (const part of components) for (const axis of ["x", "y", "z"]) {
+      const input = $(`[data-axis="${part}"] [data-component="${axis}"]`);
+      input.value = Number(transform[part][axis].toFixed(part === "rotation" ? 1 : 3));
+    }
+  };
+  const renderItem = async () => {
+    const id = itemSelect.value;
+    await window.threeShop.setCalibrationItem(id);
+    const transform = window.threeShop.calibrationTransform(id);
+    if (transform) setControls(transform);
+    status.textContent = `${id} · ${characterSelect.value === "male" ? "Panda" : "Cvrix"}`;
+  };
+  const populateItems = () => {
+    const previous = itemSelect.value;
+    itemSelect.replaceChildren(...window.threeShop.clothingIds().map((id) => {
+      const option = document.createElement("option");
+      option.value = id;
+      option.textContent = id.replace(/^(top|bottom|shoe)-/, "$1 · ").replaceAll("-", " ").toUpperCase();
+      return option;
+    }));
+    if ([...itemSelect.options].some((option) => option.value === previous)) itemSelect.value = previous;
+  };
+  const open = async () => {
+    if (!window.threeShop || !threeUiReady) return;
+    workspaceOpen = true;
+    overlay.hidden = false;
+    characterSelect.value = selectedCharacter === "PANDA" ? "male" : "female";
+    paused = true;
+    $("#pauseModal").hidden = true;
+    preview.appendChild(viewport);
+    await window.threeShop.setCharacter(characterSelect.value);
+    window.threeShop.setStage(currentStage);
+    populateItems();
+    await renderItem();
+    requestAnimationFrame(() => window.threeShop.resize());
+  };
+  const close = () => {
+    if (!workspaceOpen) return;
+    workspaceOpen = false;
+    overlay.hidden = true;
+    originalSlot.appendChild(viewport);
+    const gender = selectedCharacter === "PANDA" ? "male" : "female";
+    window.threeShop.setCharacter(gender);
+    window.threeShop.setStage(currentStage);
+    window.threeShop.setOutfit([chosen.top, chosen.bottom, chosen.shoes].filter(Boolean));
+    paused = false;
+    requestAnimationFrame(() => window.threeShop.resize());
+  };
+  $("#openWorkspaceButton").addEventListener("click", open);
+  $("#closeWorkspaceButton").addEventListener("click", close);
+  overlay.addEventListener("click", (event) => { if (event.target === overlay) close(); });
+  characterSelect.addEventListener("change", async () => {
+    await window.threeShop.setCharacter(characterSelect.value);
+    await renderItem();
+  });
+  itemSelect.addEventListener("change", renderItem);
+  for (const input of document.querySelectorAll(".axis-grid input")) input.addEventListener("input", () => {
+    window.threeShop.updateCalibrationTransform(itemSelect.value, currentTransform());
+  });
+  $("#applyWorkspaceButton").addEventListener("click", () => {
+    if (window.threeShop.applyCalibration(itemSelect.value)) status.textContent = `Đã Apply và lưu ${itemSelect.value} cho ${characterSelect.value}.`;
+  });
+  $("#downloadPresetButton").addEventListener("click", () => {
+    const data = new Blob([JSON.stringify(window.threeShop.calibrationPresetFile(), null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(data);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "thrifting101-fit-preset.json";
+    anchor.click();
+    URL.revokeObjectURL(url);
+  });
+  $("#uploadPresetInput").addEventListener("change", async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      window.threeShop.importCalibrationPresets(JSON.parse(await file.text()));
+      await renderItem();
+      status.textContent = `Đã nhập preset ${file.name}.`;
+    } catch (error) { status.textContent = error.message || "Không đọc được preset."; }
+    event.target.value = "";
+  });
+  return close;
+}
+
+const closeFitWorkspace = initializeFitWorkspace();
+
 function bindEvents() {
   const enterCharacterSelection = () => {
     if (!threeUiReady) return;
@@ -499,6 +600,7 @@ function bindEvents() {
   document.addEventListener("pointerup", endCardDrag);
   document.addEventListener("pointercancel", endCardDrag);
   document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && workspaceOpen) { closeFitWorkspace(); return; }
     if (event.key === "Escape" || event.key.toLowerCase() === "p") togglePause();
     if (event.key === "Escape" && !$("#helpModal").hidden) closeHelp();
   });
