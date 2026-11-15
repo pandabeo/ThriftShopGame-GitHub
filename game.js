@@ -580,7 +580,7 @@ function initializeFitWorkspace() {
   document.addEventListener("pointerup", stopAxisScrub);
   document.addEventListener("pointercancel", stopAxisScrub);
   $("#applyWorkspaceButton").addEventListener("click", () => {
-    if (window.threeShop.applyCalibration(itemSelect.value)) status.textContent = `Đã Apply và lưu ${itemSelect.value} cho ${characterSelect.value}.`;
+    if (window.threeShop.applyCalibration(itemSelect.value)) status.textContent = `Đã lưu ${itemSelect.value} cho ${characterSelect.value} trên trình duyệt này. Dùng Download preset để chuyển sang nơi khác.`;
   });
   $("#downloadPresetButton").addEventListener("click", () => {
     const data = new Blob([JSON.stringify(window.threeShop.calibrationPresetFile(), null, 2)], { type: "application/json" });
