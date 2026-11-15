@@ -150,6 +150,9 @@ class ThreeShop {
     this.clothingBases = new Map();
     this.aura = null;
     this.auraKey = null;
+    this.characterPreviewRenderer = null;
+    this.characterPreviewViews = [];
+    this.characterPreviewSize = { width: 0, height: 0 };
     this.calibrationPresets = this.readCalibrationPresets();
     this.rotatePointer = null;
     this.preparationPromises = new Map();
@@ -280,11 +283,102 @@ class ThreeShop {
   async init() {
     this.loading?.classList.add("is-ready");
     window.dispatchEvent(new CustomEvent("three-ui-ready"));
+    void this.loadCharacterPreviews();
     setTimeout(() => {
       void this.preloadAllModels([
         characterModels.male,
       ], "background");
     }, 180);
+  }
+
+  async loadCharacterPreviews() {
+    const grid = document.querySelector("#characterPreviewGrid");
+    const canvas = document.querySelector("#characterPreviewCanvas");
+    if (!grid || !canvas) return;
+    try {
+      const results = await Promise.allSettled([
+        this.loadTemplate(characterModels.male),
+        this.loadTemplate(characterModels.female),
+      ]);
+      const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+      renderer.setClearColor(0x000000, 0);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.15;
+      this.characterPreviewRenderer = renderer;
+
+      for (const [index, gender] of ["male", "female"].entries()) {
+        const result = results[index];
+        const slot = grid.querySelector(`[data-preview-slot="${gender}"]`);
+        if (result.status !== "fulfilled") {
+          if (slot) slot.querySelector(".preview-loading").textContent = "MODEL KHÔNG TẢI ĐƯỢC";
+          console.warn(`3D character preview failed: ${gender}`, result.reason);
+          continue;
+        }
+        const scene = new THREE.Scene();
+        scene.add(new THREE.HemisphereLight(0xffffff, 0x333333, 2));
+        const key = new THREE.DirectionalLight(0xffffff, 3.2);
+        key.position.set(4, 7, 6);
+        scene.add(key);
+        const model = this.clone(result.value);
+        this.fitHeight(model, 3.55);
+        model.position.y -= 1.775;
+        if (gender === "female") {
+          model.traverse((child) => {
+            if (!child.isMesh) return;
+            const existing = Array.isArray(child.material) ? child.material : [child.material];
+            existing.forEach((material) => material?.dispose());
+            const silhouette = () => new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide });
+            child.material = Array.isArray(child.material)
+              ? child.material.map(() => silhouette())
+              : silhouette();
+          });
+        }
+        scene.add(model);
+        const camera = new THREE.PerspectiveCamera(33, 1, 0.1, 100);
+        camera.position.set(0, 0, 7.4);
+        camera.lookAt(0, 0, 0);
+        this.characterPreviewViews.push({ gender, slot, scene, camera, model });
+        if (slot) {
+          const loadingLabel = slot.querySelector(".preview-loading");
+          if (loadingLabel) loadingLabel.hidden = true;
+        }
+      }
+      this.renderCharacterPreviews();
+    } catch (error) {
+      console.warn("Character selection previews could not be initialized", error);
+    }
+  }
+
+  renderCharacterPreviews() {
+    const renderer = this.characterPreviewRenderer;
+    const grid = document.querySelector("#characterPreviewGrid");
+    if (!renderer || !grid || !this.characterPreviewViews.length) return;
+    const gridRect = grid.getBoundingClientRect();
+    if (!gridRect.width || !gridRect.height) return;
+    if (this.characterPreviewSize.width !== gridRect.width || this.characterPreviewSize.height !== gridRect.height) {
+      renderer.setSize(gridRect.width, gridRect.height, false);
+      this.characterPreviewSize = { width: gridRect.width, height: gridRect.height };
+    }
+    renderer.setScissorTest(true);
+    const time = this.clock.elapsedTime;
+    for (const view of this.characterPreviewViews) {
+      if (!view.slot) continue;
+      const rect = view.slot.getBoundingClientRect();
+      const left = rect.left - gridRect.left;
+      const bottom = gridRect.bottom - rect.bottom;
+      const width = rect.width;
+      const height = rect.height;
+      view.camera.aspect = rect.width / Math.max(1, rect.height);
+      view.camera.updateProjectionMatrix();
+      view.model.rotation.y = Math.sin(time * 0.45) * (view.gender === "male" ? 0.13 : 0.08);
+      renderer.setViewport(left, bottom, width, height);
+      renderer.setScissor(left, bottom, width, height);
+      renderer.clear(true, true, true);
+      renderer.render(view.scene, view.camera);
+    }
+    renderer.setScissorTest(false);
   }
 
   loadTemplate(path) {
@@ -838,6 +932,7 @@ class ThreeShop {
     if (this.character) this.character.rotation.y = Math.sin(this.clock.elapsedTime * 0.75) * 0.045;
     this.animateAura(this.clock.elapsedTime);
     this.renderer.render(this.scene, this.camera);
+    this.renderCharacterPreviews();
   }
 }
 
