@@ -87,7 +87,7 @@ const sounds = {
 const audioState = { enabled: true, currentMusic: null };
 
 function syncThreeScene() {
-  const kind = selectedCharacter === "PANDA" ? "male" : "female";
+  const kind = "male";
   window.dispatchEvent(new CustomEvent("three-game-state", {
     detail: {
       kind,
@@ -226,10 +226,11 @@ function setCharacterCardsLoading(active, gender = "") {
 }
 
 async function selectCharacter(gender) {
+  if (gender !== "male") return;
   if (!threeUiReady || characterLoading) return;
   characterLoading = true;
   setCharacterCardsLoading(true, gender);
-  selectedCharacter = gender === "male" ? "PANDA" : "CVRIX";
+  selectedCharacter = "PANDA";
   currentStage = 0;
   chosen.top = null;
   chosen.bottom = null;
@@ -498,7 +499,7 @@ function initializeFitWorkspace() {
     await window.threeShop.setCalibrationItem(id);
     const transform = window.threeShop.calibrationTransform(id);
     if (transform) setControls(transform);
-    status.textContent = `${id} · ${characterSelect.value === "male" ? "Panda" : "Cvrix"} · Lưu trên trình duyệt này`;
+    status.textContent = `${id} · Panda · Lưu trên trình duyệt này`;
   };
   const populateItems = () => {
     const previous = itemSelect.value;
@@ -514,7 +515,7 @@ function initializeFitWorkspace() {
     if (!window.threeShop || !threeUiReady) return;
     workspaceOpen = true;
     overlay.hidden = false;
-    characterSelect.value = selectedCharacter === "PANDA" ? "male" : "female";
+    characterSelect.value = "male";
     paused = true;
     $("#pauseModal").hidden = true;
     preview.appendChild(viewport);
@@ -529,8 +530,7 @@ function initializeFitWorkspace() {
     workspaceOpen = false;
     overlay.hidden = true;
     originalSlot.appendChild(viewport);
-    const gender = selectedCharacter === "PANDA" ? "male" : "female";
-    window.threeShop.setCharacter(gender);
+    window.threeShop.setCharacter("male");
     window.threeShop.setStage(currentStage);
     window.threeShop.setOutfit([chosen.top, chosen.bottom, chosen.shoes].filter(Boolean));
     paused = false;

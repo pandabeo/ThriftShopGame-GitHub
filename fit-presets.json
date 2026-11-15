@@ -1,10 +1,40 @@
 {
-  "version": 5,
+  "version": 6,
   "app": "Thrifting 101 Fit Workspace",
   "source": "User supplied preset",
   "items": {
     "male:top-check": {
-      "position": { "x": 26.40000000000009, "y": 52.30000000000001, "z": -66 },
+      "position": { "x": 26.4, "y": 52.3, "z": -66 },
+      "scale": { "x": 1.7, "y": 1.7, "z": 1.7 },
+      "rotation": { "x": 0, "y": 0, "z": 0 }
+    },
+    "male:top-racing": {
+      "position": { "x": 15.4, "y": 84.7, "z": -91.3 },
+      "scale": { "x": 1.6, "y": 1.6, "z": 1.6 },
+      "rotation": { "x": 0, "y": 0, "z": 0 }
+    },
+    "male:top-plaid": {
+      "position": { "x": 46.2, "y": 16.5, "z": -6.6 },
+      "scale": { "x": 1.1, "y": 1.1, "z": 1.1 },
+      "rotation": { "x": 0, "y": 0, "z": 0 }
+    },
+    "male:top-black": {
+      "position": { "x": 17.6, "y": 89.1, "z": -48.4 },
+      "scale": { "x": 1.6, "y": 1.6, "z": 1.6 },
+      "rotation": { "x": 0, "y": 0, "z": 0 }
+    },
+    "male:top-print": {
+      "position": { "x": 44, "y": -79.2, "z": -89.1 },
+      "scale": { "x": 1.2, "y": 1.2, "z": 1.2 },
+      "rotation": { "x": 0, "y": 0, "z": 0 }
+    },
+    "male:top-cobalt": {
+      "position": { "x": -19.8, "y": 40.7, "z": -82.5 },
+      "scale": { "x": 1.5, "y": 1.5, "z": 1.5 },
+      "rotation": { "x": 0, "y": 0, "z": 0 }
+    },
+    "male:top-ivory": {
+      "position": { "x": 27.5, "y": 42.9, "z": -74.8 },
       "scale": { "x": 1.7, "y": 1.7, "z": 1.7 },
       "rotation": { "x": 0, "y": 0, "z": 0 }
     }
