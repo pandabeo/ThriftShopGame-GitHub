@@ -1,0 +1,12 @@
+{
+  "version": 4,
+  "app": "Thrifting 101 Fit Workspace",
+  "source": "Corrected from user supplied preset",
+  "items": {
+    "male:top-check": {
+      "position": { "x": 0, "y": 0, "z": 0 },
+      "scale": { "x": 1, "y": 1, "z": 1 },
+      "rotation": { "x": 0, "y": 0, "z": 0 }
+    }
+  }
+}
