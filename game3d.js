@@ -107,7 +107,9 @@ const clothingFit = {
   "top-racing": { height: 1.34, y: 0.48, z: 0.18, x: 0.12 },
   "top-plaid": { height: 1.12, y: 0.52, z: 0.20, x: 0.12 },
   "top-black": { height: 1.28, y: 0.48, z: 0.18, x: 0.12 },
-  "top-print": { height: 1.30, y: 0.52, z: 0.20, x: 0.16 },
+  // The pink Top 7 mesh sits behind the male torso at the default depth.
+  // Bring it slightly forward while keeping its centre on the chest.
+  "top-print": { height: 1.30, y: 0.52, z: 0.34, x: 0.12 },
   "top-cobalt": { height: 1.42, y: 0.50, z: 0.20, x: 0.24 },
   "top-ivory": { height: 1.34, y: 0.48, z: 0.18, x: 0.12 },
 };
