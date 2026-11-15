@@ -854,6 +854,7 @@ class ThreeShop {
     this.clothingBases.clear();
     if (!this.character) return;
 
+    this.character.rotation.y = 0;
     this.character.updateMatrixWorld(true);
     const characterBox = new THREE.Box3().setFromObject(this.character);
     const characterSize = characterBox.getSize(new THREE.Vector3());
