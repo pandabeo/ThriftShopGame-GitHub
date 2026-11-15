@@ -186,7 +186,7 @@ function clearBasketForStage() {
   const basket = $("#basketItem");
   const card = basket?.querySelector(".item-card");
   if (card) card.remove();
-  if (basket) basket.innerHTML = `<span class="basket-placeholder">Chưa chọn item</span>`;
+  if (basket) basket.innerHTML = `<span class="basket-placeholder">Thả đồ vào ô này</span>`;
 }
 
 function resetRun(returnToTitle = true) {
@@ -255,10 +255,11 @@ function renderBasket() {
   const item = chosen[currentSlot()];
   const basket = $("#basketItem");
   const card = basket?.querySelector(".item-card");
+  $("#basketDropzone").classList.toggle("has-item", Boolean(item));
   $("#basketCount").textContent = item ? "1 ITEM" : "EMPTY";
   $("#continueButton").disabled = !item;
   $("#continueButton").hidden = !item;
-  if (!item && !card) basket.innerHTML = `<span class="basket-placeholder">Chưa chọn item</span>`;
+  if (!item && !card) basket.innerHTML = `<span class="basket-placeholder">Thả đồ vào ô này</span>`;
 }
 
 function clamp(value, min, max) { return Math.min(max, Math.max(min, value)); }
@@ -348,17 +349,22 @@ function moveCardDrag(event) {
   card.style.top = `${event.clientY - dragState.offsetY}px`;
   card.style.transform = "rotate(0deg)";
   dragState.moved = dragState.moved || Math.hypot(event.clientX - dragState.startX, event.clientY - dragState.startY) > 6;
-  $("#basketDropzone").classList.toggle("is-over", isInside($("#basketDropzone").getBoundingClientRect(), event.clientX, event.clientY));
+  const overAvatar = isInside($("#basketDropzone").getBoundingClientRect(), event.clientX, event.clientY);
+  const overSlot = isInside($("#basketItem").getBoundingClientRect(), event.clientX, event.clientY);
+  $("#basketDropzone").classList.toggle("is-over", overAvatar);
+  $("#basketItem").classList.toggle("is-over", overSlot);
 }
 
 function endCardDrag(event) {
   if (!dragState || event.pointerId !== dragState.pointerId) return;
   const { card, moved } = dragState;
   const overBasket = isInside($("#basketDropzone").getBoundingClientRect(), event.clientX, event.clientY);
+  const overSlot = isInside($("#basketItem").getBoundingClientRect(), event.clientX, event.clientY);
   $("#basketDropzone").classList.remove("is-over");
+  $("#basketItem").classList.remove("is-over");
   card.releasePointerCapture?.(event.pointerId);
   dragState = null;
-  if (overBasket) {
+  if (overBasket || overSlot) {
     placeCardInBasket(card);
   } else {
     restoreCardToGrid(card, false);

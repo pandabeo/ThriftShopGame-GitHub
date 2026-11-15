@@ -132,7 +132,7 @@ class ThreeShop {
     this.cache = new Map();
     this.wardrobePromises = new Map();
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0x142a51, 8, 28);
+    this.scene.background = new THREE.Color(0x000000);
     this.camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100);
     this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, alpha: false });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -148,25 +148,18 @@ class ThreeShop {
     this.outfitItems = [];
     this.clothingObjects = new Map();
     this.clothingBases = new Map();
+    this.aura = null;
+    this.auraKey = null;
     this.calibrationPresets = this.readCalibrationPresets();
     this.rotatePointer = null;
-    this.environmentFiles = [
-      ["cashier", "Furniture/cashier.fbx", 2.5, [4.2, -1.38, -3.4], Math.PI],
-      ["curtain", "Furniture/curtain.fbx", 3.8, [0, -1.38, -5], 0],
-      ["sign", "Furniture/banghieu.fbx", 2.6, [0, 2.9, -5], 0],
-    ];
-    this.environmentPromise = null;
     this.preparationPromises = new Map();
     this.mode = "shop";
     this.yaw = 0;
     this.radius = 8.5;
     this.target = new THREE.Vector3(0, 1.25, 0);
     this.actorZ = 2.2;
-    this.environment = new THREE.Group();
-    this.scene.add(this.environment);
     this.ready = false;
     this.setupLights();
-    this.setupFloor();
     this.resize();
     this.mount.addEventListener("pointerdown", (event) => {
       if (![0, 2].includes(event.button) || !this.character) return;
@@ -197,38 +190,15 @@ class ThreeShop {
   }
 
   setupLights() {
-    this.scene.add(new THREE.HemisphereLight(0xbad2ff, 0x1c2540, 2.2));
-    const key = new THREE.DirectionalLight(0xffe1b2, 3.4);
+    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x242424, 1.8));
+    const key = new THREE.DirectionalLight(0xffffff, 3.2);
     key.position.set(5, 9, 5);
     key.castShadow = true;
     key.shadow.mapSize.set(1024, 1024);
     this.scene.add(key);
-    const rim = new THREE.PointLight(0x5c86ff, 35, 13, 2);
-    rim.position.set(-5, 3, -2);
-    this.scene.add(rim);
-  }
-
-  setupFloor() {
-    const texture = new THREE.TextureLoader().load(ASSET("cho-do-si-hoang-hoa-tham.jpg"));
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.wrapS = THREE.RepeatWrapping;
-    texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(4, 4);
-    const floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(24, 20),
-      new THREE.MeshStandardMaterial({ map: texture, roughness: 1, metalness: 0 })
-    );
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.y = -1.42;
-    floor.receiveShadow = true;
-    this.scene.add(floor);
-
-    const back = new THREE.Mesh(
-      new THREE.PlaneGeometry(24, 12),
-      new THREE.MeshStandardMaterial({ color: 0x13294c, roughness: 1 })
-    );
-    back.position.set(0, 4, -5.5);
-    this.scene.add(back);
+    this.auraLight = new THREE.PointLight(0xffffff, 0, 7, 2);
+    this.auraLight.position.set(0, 1.7, 0.4);
+    this.scene.add(this.auraLight);
   }
 
   async preloadAllModels(paths, phase = "critical") {
@@ -267,34 +237,15 @@ class ThreeShop {
     return promise;
   }
 
-  loadEnvironment() {
-    if (this.environmentPromise) return this.environmentPromise;
-    this.environmentPromise = Promise.allSettled(this.environmentFiles.map(async ([key, path, height, position, rotation]) => {
-      try {
-        const model = await this.loadTemplate(path);
-        const object = this.clone(model);
-        this.fitHeight(object, height);
-        object.position.set(...position);
-        object.rotation.y = rotation;
-        this.environment.add(object);
-      } catch (error) {
-        console.warn(`3D environment asset failed: ${path}`, error);
-      }
-    }));
-    return this.environmentPromise;
-  }
-
   prepareForGame(kind) {
     kind = "male";
     if (this.preparationPromises.has(kind)) return this.preparationPromises.get(kind);
     const promise = this.loadBundledCalibrationPresets().then(() => Promise.all([
       this.preloadAllModels([
-        ...this.environmentFiles.map(([, path]) => path),
         characterModels[kind],
       ], "game"),
       this.preloadWardrobe(kind),
     ])).then(async () => {
-      await this.loadEnvironment();
       await this.setCharacter(kind);
       this.ready = true;
       this.loading?.classList.add("is-ready");
@@ -331,7 +282,6 @@ class ThreeShop {
     window.dispatchEvent(new CustomEvent("three-ui-ready"));
     setTimeout(() => {
       void this.preloadAllModels([
-        ...this.environmentFiles.map(([, path]) => path),
         characterModels.male,
       ], "background");
     }, 180);
@@ -555,8 +505,13 @@ class ThreeShop {
       this.character.position.y += -1.36;
       this.character.position.z += this.actorZ;
       this.scene.add(this.character);
+      this.character.add(this.auraLight);
+      this.auraLight.position.set(0, 1.7, 0.45);
       this.character.add(this.outfitGroup);
       this.outfitGroup.position.set(0, 0, 0);
+      this.clearAura();
+      this.auraKey = null;
+      this.setAuraForTop(this.outfitItems.find((item) => item.id.startsWith("top-")));
       await this.rebuildOutfit();
     } catch (error) {
       console.warn("3D character asset failed", error);
@@ -579,7 +534,102 @@ class ThreeShop {
 
   setOutfit(items = []) {
     this.outfitItems = items;
+    this.setAuraForTop(items.find((item) => item.id.startsWith("top-")));
     return this.rebuildOutfit();
+  }
+
+  setAuraForTop(item) {
+    const auraStyles = {
+      "top-check": { name: "FIRE AURA", color: 0xff542e, light: 0xff3b16, motion: "rise" },
+      "top-racing": { name: "LIGHTNING AURA", color: 0x57caff, light: 0x168cff, motion: "flicker" },
+      "top-plaid": { name: "TOXIC AURA", color: 0x8cff38, light: 0x56ff00, motion: "drift" },
+      "top-black": { name: "SHADOW AURA", color: 0xa875ff, light: 0x793bff, motion: "drift" },
+      "top-print": { name: "PLASMA AURA", color: 0xff59dc, light: 0xf518c0, motion: "flicker" },
+      "top-cobalt": { name: "FROST AURA", color: 0x4dfff4, light: 0x10cfff, motion: "drift" },
+      "top-ivory": { name: "GOLD AURA", color: 0xffd85a, light: 0xffab16, motion: "rise" },
+    };
+    const style = item ? auraStyles[item.id] : null;
+    const nextKey = style ? item.id : null;
+    if (nextKey === this.auraKey && (this.aura || !this.character)) return;
+    this.clearAura();
+    this.auraKey = nextKey;
+    if (!style || !this.character) {
+      this.auraLight.color.setHex(style?.light || 0xffffff);
+      this.auraLight.intensity = style ? 2.4 : 0;
+      const badge = document.querySelector("#threeBadge");
+      if (badge) badge.textContent = style?.name || "TRY-ON MODEL";
+      return;
+    }
+    const particles = Array.from({ length: 112 }, (_, index) => ({
+      angle: index * 2.399963,
+      height: 0.12 + (index % 37) / 37 * 3.25,
+      radius: 0.48 + (index % 7) * 0.095,
+      speed: 0.5 + (index % 5) * 0.16,
+      phase: index * 0.71,
+    }));
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(particles.length * 3), 3));
+    const glowCanvas = document.createElement("canvas");
+    glowCanvas.width = 64;
+    glowCanvas.height = 64;
+    const glowContext = glowCanvas.getContext("2d");
+    const glow = glowContext.createRadialGradient(32, 32, 2, 32, 32, 32);
+    glow.addColorStop(0, "rgba(255,255,255,1)");
+    glow.addColorStop(0.3, "rgba(255,255,255,.8)");
+    glow.addColorStop(1, "rgba(255,255,255,0)");
+    glowContext.fillStyle = glow;
+    glowContext.fillRect(0, 0, 64, 64);
+    const glowTexture = new THREE.CanvasTexture(glowCanvas);
+    const material = new THREE.PointsMaterial({
+      color: style.color,
+      map: glowTexture,
+      size: 0.105,
+      sizeAttenuation: true,
+      transparent: true,
+      opacity: 0.78,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const aura = new THREE.Points(geometry, material);
+    aura.name = `${style.name.replaceAll(" ", "_")}_Particles`;
+    aura.frustumCulled = false;
+    aura.userData = { style, particles, glowTexture };
+    this.character.add(aura);
+    this.aura = aura;
+    this.auraLight.color.setHex(style.light);
+    this.auraLight.intensity = 2.4;
+    const badge = document.querySelector("#threeBadge");
+    if (badge) badge.textContent = style.name;
+  }
+
+  clearAura() {
+    if (!this.aura) return;
+    this.aura.parent?.remove(this.aura);
+    this.aura.geometry.dispose();
+    this.aura.material.dispose();
+    this.aura.userData.glowTexture?.dispose();
+    this.aura = null;
+  }
+
+  animateAura(time) {
+    if (!this.aura) return;
+    const { style, particles } = this.aura.userData;
+    const positions = this.aura.geometry.attributes.position;
+    for (let index = 0; index < particles.length; index += 1) {
+      const particle = particles[index];
+      const rise = style.motion === "rise" ? time * particle.speed * 0.34 : 0;
+      const height = (particle.height + rise + Math.sin(time * particle.speed + particle.phase) * 0.11) % 3.5;
+      const angle = particle.angle + time * particle.speed * (style.motion === "drift" ? 0.42 : 0.8);
+      const radius = particle.radius + Math.sin(time * 2.1 + particle.phase) * 0.08;
+      positions.setXYZ(index, Math.cos(angle) * radius, height, Math.sin(angle) * radius);
+    }
+    positions.needsUpdate = true;
+    this.aura.material.opacity = style.motion === "flicker"
+      ? 0.42 + Math.abs(Math.sin(time * 16)) * 0.5
+      : 0.58 + Math.sin(time * 3.2) * 0.16;
+    this.auraLight.intensity = style.motion === "flicker"
+      ? 1.2 + Math.abs(Math.sin(time * 16)) * 3.2
+      : 1.9 + Math.sin(time * 2.4) * 0.45;
   }
 
   readCalibrationPresets() {
@@ -786,6 +836,7 @@ class ThreeShop {
     this.camera.position.set(x, this.target.y + this.radius * pitch, z);
     this.camera.lookAt(this.target);
     if (this.character) this.character.rotation.y = Math.sin(this.clock.elapsedTime * 0.75) * 0.045;
+    this.animateAura(this.clock.elapsedTime);
     this.renderer.render(this.scene, this.camera);
   }
 }
