@@ -265,7 +265,7 @@ class ThreeShop {
 
   async loadBundledCalibrationPresets() {
     if (this.bundledPresetsLoaded) return;
-    if (this.calibrationPresetVersion === 10 && Object.keys(this.calibrationPresets).length) {
+    if (this.calibrationPresetVersion === 11 && Object.keys(this.calibrationPresets).length) {
       this.bundledPresetsLoaded = true;
       return;
     }
@@ -273,11 +273,11 @@ class ThreeShop {
       const response = await fetch("./fit-presets.json", { cache: "no-cache" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
-      if (data.version === 10 && data.items && typeof data.items === "object") {
+      if (data.version === 11 && data.items && typeof data.items === "object") {
         this.calibrationPresets = { ...this.calibrationPresets, ...data.items };
         if (data.characterPosition) this.characterPositionOffset = { ...this.characterPositionOffset, ...data.characterPosition };
-        localStorage.setItem("thrifting101-fit-presets", JSON.stringify({ version: 10, items: this.calibrationPresets, characterPosition: this.characterPositionOffset }));
-        this.calibrationPresetVersion = 10;
+        localStorage.setItem("thrifting101-fit-presets", JSON.stringify({ version: 11, items: this.calibrationPresets, characterPosition: this.characterPositionOffset }));
+        this.calibrationPresetVersion = 11;
       }
     } catch (error) {
       console.warn("Bundled clothing preset failed to load", error);
@@ -779,7 +779,7 @@ class ThreeShop {
       if (parsed?.characterPosition && ["x", "y", "z"].every((axis) => Number.isFinite(parsed.characterPosition[axis]))) {
         this.characterPositionOffset = { ...parsed.characterPosition };
       }
-      return parsed && [4, 5, 6, 7, 8, 9, 10].includes(parsed.version) && parsed.items ? parsed.items : {};
+      return parsed && [4, 5, 6, 7, 8, 9, 10, 11].includes(parsed.version) && parsed.items ? parsed.items : {};
     } catch { return {}; }
   }
 
@@ -851,13 +851,13 @@ class ThreeShop {
     const transform = this.calibrationTransform(id);
     if (!transform) return false;
     this.calibrationPresets[this.calibrationKey(id)] = transform;
-    localStorage.setItem("thrifting101-fit-presets", JSON.stringify({ version: 10, items: this.calibrationPresets, characterPosition: this.characterPositionOffset }));
-    this.calibrationPresetVersion = 10;
+    localStorage.setItem("thrifting101-fit-presets", JSON.stringify({ version: 11, items: this.calibrationPresets, characterPosition: this.characterPositionOffset }));
+    this.calibrationPresetVersion = 11;
     return true;
   }
 
   importCalibrationPresets(data) {
-    if (!data || ![2, 3, 4, 5, 6, 7, 8, 9, 10].includes(data.version) || !data.items || typeof data.items !== "object") throw new Error("File preset không đúng phiên bản workspace.");
+    if (!data || ![2, 3, 4, 5, 6, 7, 8, 9, 10, 11].includes(data.version) || !data.items || typeof data.items !== "object") throw new Error("File preset không đúng phiên bản workspace.");
     const allowed = new Set(this.clothingIds());
     for (const [key, value] of Object.entries(data.items)) {
       const [kind, id] = key.split(":");
@@ -868,12 +868,12 @@ class ThreeShop {
     if (data.characterPosition && ["x", "y", "z"].every((axis) => Number.isFinite(data.characterPosition[axis]))) {
       this.applyCharacterPositionOffset(data.characterPosition);
     }
-    localStorage.setItem("thrifting101-fit-presets", JSON.stringify({ version: 10, items: this.calibrationPresets, characterPosition: this.characterPositionOffset }));
-    this.calibrationPresetVersion = 10;
+    localStorage.setItem("thrifting101-fit-presets", JSON.stringify({ version: 11, items: this.calibrationPresets, characterPosition: this.characterPositionOffset }));
+    this.calibrationPresetVersion = 11;
   }
 
   calibrationPresetFile() {
-    return { version: 10, app: "Thrifting 101 Fit Workspace", exportedAt: new Date().toISOString(), characterPosition: this.characterPositionOffset, items: this.calibrationPresets };
+    return { version: 11, app: "Thrifting 101 Fit Workspace", exportedAt: new Date().toISOString(), characterPosition: this.characterPositionOffset, items: this.calibrationPresets };
   }
 
   itemSlot(id) {
