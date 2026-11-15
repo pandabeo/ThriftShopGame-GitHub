@@ -306,7 +306,7 @@ class ThreeShop {
 
   async loadBundledCalibrationPresets() {
     if (this.bundledPresetsLoaded) return;
-    if (Object.keys(this.calibrationPresets).length) {
+    if (this.calibrationPresetVersion === 5 && Object.keys(this.calibrationPresets).length) {
       this.bundledPresetsLoaded = true;
       return;
     }
@@ -314,8 +314,10 @@ class ThreeShop {
       const response = await fetch("./fit-presets.json", { cache: "no-cache" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
-      if (data.version === 4 && data.items && typeof data.items === "object") {
-        this.calibrationPresets = data.items;
+      if (data.version === 5 && data.items && typeof data.items === "object") {
+        this.calibrationPresets = { ...this.calibrationPresets, ...data.items };
+        localStorage.setItem("thrifting101-fit-presets", JSON.stringify({ version: 5, items: this.calibrationPresets }));
+        this.calibrationPresetVersion = 5;
       }
     } catch (error) {
       console.warn("Bundled clothing preset failed to load", error);
@@ -581,7 +583,8 @@ class ThreeShop {
   readCalibrationPresets() {
     try {
       const parsed = JSON.parse(localStorage.getItem("thrifting101-fit-presets") || "{}");
-      return parsed && parsed.version === 4 && parsed.items ? parsed.items : {};
+      this.calibrationPresetVersion = parsed?.version;
+      return parsed && [4, 5].includes(parsed.version) && parsed.items ? parsed.items : {};
     } catch { return {}; }
   }
 
@@ -631,12 +634,13 @@ class ThreeShop {
     const transform = this.calibrationTransform(id);
     if (!transform) return false;
     this.calibrationPresets[this.calibrationKey(id)] = transform;
-    localStorage.setItem("thrifting101-fit-presets", JSON.stringify({ version: 4, items: this.calibrationPresets }));
+    localStorage.setItem("thrifting101-fit-presets", JSON.stringify({ version: 5, items: this.calibrationPresets }));
+    this.calibrationPresetVersion = 5;
     return true;
   }
 
   importCalibrationPresets(data) {
-    if (!data || ![2, 3, 4].includes(data.version) || !data.items || typeof data.items !== "object") throw new Error("File preset không đúng phiên bản workspace.");
+    if (!data || ![2, 3, 4, 5].includes(data.version) || !data.items || typeof data.items !== "object") throw new Error("File preset không đúng phiên bản workspace.");
     const allowed = new Set(this.clothingIds());
     for (const [key, value] of Object.entries(data.items)) {
       const [kind, id] = key.split(":");
@@ -644,11 +648,12 @@ class ThreeShop {
       if (!["position", "scale", "rotation"].every((part) => ["x", "y", "z"].every((axis) => Number.isFinite(value?.[part]?.[axis])))) continue;
       this.calibrationPresets[key] = value;
     }
-    localStorage.setItem("thrifting101-fit-presets", JSON.stringify({ version: 4, items: this.calibrationPresets }));
+    localStorage.setItem("thrifting101-fit-presets", JSON.stringify({ version: 5, items: this.calibrationPresets }));
+    this.calibrationPresetVersion = 5;
   }
 
   calibrationPresetFile() {
-    return { version: 4, app: "Thrifting 101 Fit Workspace", exportedAt: new Date().toISOString(), items: this.calibrationPresets };
+    return { version: 5, app: "Thrifting 101 Fit Workspace", exportedAt: new Date().toISOString(), items: this.calibrationPresets };
   }
 
   itemSlot(id) {

@@ -28,7 +28,7 @@ Three.js được nạp từ CDN nên GitHub Pages cần Internet ở lần ch�
 
 Trong shop, nhấn **FIT WORKSPACE** để xem từng model quần áo trên Panda hoặc Cvrix. Pivot runtime của mỗi món được đặt tại tâm bounding box sau khi tự căn để vị trí, scale và xoay lấy tâm quần áo làm điểm chuẩn mà không sửa FBX gốc. Giữ chuột trên nhãn trục X/Y/Z rồi kéo trái/phải để chỉnh nhanh; mỗi 4 pixel thay đổi 1,1 đơn vị cho Position/Rotation và 0,1 cho Scale. Có thể bấm vào ô số để nhập chính xác. Các giá trị cập nhật trực tiếp trên preview. Nhấn **Apply & save** để áp dụng và lưu preset vào trình duyệt. Preset được tự động dùng lại khi món đồ xuất hiện trong game.
 
-Preset mặc định của repo nằm trong `fit-presets.json` và được nạp khi trình duyệt chưa có preset đã lưu. Transform `male:top-check` từ file cũ được đưa về tâm model vì các offset trước đó sẽ đưa áo ra ngoài khung hình.
+Preset mặc định của repo nằm trong `fit-presets.json`. Khi cập nhật revision preset mặc định, trình duyệt áp dụng mục mặc định mới và giữ lại các mục đã lưu khác. Preset mới hiện gồm transform `male:top-check` từ file người dùng cung cấp.
 
 **Download preset** xuất toàn bộ transform đã Apply thành `thrifting101-fit-preset.json`. Dùng **Import preset** để nạp JSON trở lại workspace. Preset tách theo nhân vật và ID quần áo.
 
