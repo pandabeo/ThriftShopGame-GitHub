@@ -562,7 +562,7 @@ class ThreeShop {
   readCalibrationPresets() {
     try {
       const parsed = JSON.parse(localStorage.getItem("thrifting101-fit-presets") || "{}");
-      return parsed && parsed.version === 2 && parsed.items ? parsed.items : {};
+      return parsed && parsed.version === 3 && parsed.items ? parsed.items : {};
     } catch { return {}; }
   }
 
@@ -612,12 +612,12 @@ class ThreeShop {
     const transform = this.calibrationTransform(id);
     if (!transform) return false;
     this.calibrationPresets[this.calibrationKey(id)] = transform;
-    localStorage.setItem("thrifting101-fit-presets", JSON.stringify({ version: 2, items: this.calibrationPresets }));
+    localStorage.setItem("thrifting101-fit-presets", JSON.stringify({ version: 3, items: this.calibrationPresets }));
     return true;
   }
 
   importCalibrationPresets(data) {
-    if (!data || data.version !== 2 || !data.items || typeof data.items !== "object") throw new Error("File preset không đúng phiên bản workspace.");
+    if (!data || ![2, 3].includes(data.version) || !data.items || typeof data.items !== "object") throw new Error("File preset không đúng phiên bản workspace.");
     const allowed = new Set(this.clothingIds());
     for (const [key, value] of Object.entries(data.items)) {
       const [kind, id] = key.split(":");
@@ -625,11 +625,11 @@ class ThreeShop {
       if (!["position", "scale", "rotation"].every((part) => ["x", "y", "z"].every((axis) => Number.isFinite(value?.[part]?.[axis])))) continue;
       this.calibrationPresets[key] = value;
     }
-    localStorage.setItem("thrifting101-fit-presets", JSON.stringify({ version: 2, items: this.calibrationPresets }));
+    localStorage.setItem("thrifting101-fit-presets", JSON.stringify({ version: 3, items: this.calibrationPresets }));
   }
 
   calibrationPresetFile() {
-    return { version: 2, app: "Thrifting 101 Fit Workspace", exportedAt: new Date().toISOString(), items: this.calibrationPresets };
+    return { version: 3, app: "Thrifting 101 Fit Workspace", exportedAt: new Date().toISOString(), items: this.calibrationPresets };
   }
 
   itemSlot(id) {

@@ -554,13 +554,15 @@ function initializeFitWorkspace() {
       if (event.target.closest("input")) return;
       const input = label.querySelector("input");
       if (!input) return;
+      const axisGroup = label.closest(".axis-grid")?.dataset.axis;
       axisScrub = {
         input,
         startX: event.clientX,
         startValue: Number(input.value) || 0,
-        step: 1.1,
+        step: axisGroup === "scale" ? 0.1 : 1.1,
         min: input.min === "" ? Number.NEGATIVE_INFINITY : Number(input.min),
         max: input.max === "" ? Number.POSITIVE_INFINITY : Number(input.max),
+        decimals: axisGroup === "scale" ? 2 : 1,
       };
       label.setPointerCapture(event.pointerId);
       event.preventDefault();
@@ -570,7 +572,7 @@ function initializeFitWorkspace() {
     if (!axisScrub) return;
     const steps = Math.round((event.clientX - axisScrub.startX) / 4);
     const nextValue = Math.max(axisScrub.min, Math.min(axisScrub.max, axisScrub.startValue + steps * axisScrub.step));
-    axisScrub.input.value = nextValue.toFixed(1);
+    axisScrub.input.value = nextValue.toFixed(axisScrub.decimals);
     axisScrub.input.dispatchEvent(new Event("input", { bubbles: true }));
     event.preventDefault();
   });
