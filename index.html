@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#13223c" />
+    <title>Thrifting 101 — HTML Remake</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="game-shell" aria-live="polite">
+      <header class="site-header">
+        <div class="brand-lockup">
+          <span class="brand-mark">T101</span>
+          <div>
+            <p class="eyebrow">PANDA × CVRIX</p>
+            <p class="brand-title">THRIFTING 101</p>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button class="icon-button" id="audioButton" type="button" aria-label="Bật hoặc tắt âm thanh">♪</button>
+          <button class="icon-button" id="helpButton" type="button" aria-label="Mở hướng dẫn">?</button>
+        </div>
+      </header>
+
+      <section class="screen active" id="titleScreen" aria-labelledby="titleHeading">
+        <div class="title-grid">
+          <div class="title-copy">
+            <p class="eyebrow accent-text">A THRILLIN' THRIFTIN' EXPERIENCE</p>
+            <h1 id="titleHeading">Thrift fast.<br /><span>Dress loud.</span></h1>
+            <p class="lead">Chọn một bộ đồ thật có gu, đưa từng món vào model thử đồ và hoàn thiện look của bạn.</p>
+            <div class="title-actions">
+            <button class="primary-button" id="startButton" type="button" disabled>Đang mở menu…</button>
+            <span class="preload-status" id="preloadStatus">Đang khởi tạo giao diện…</span>
+              <button class="ghost-button" id="titleHelpButton" type="button">Cách chơi</button>
+            </div>
+            <div class="title-note"><span class="pulse-dot"></span> Một chuyến đi ngắn. Một bộ outfit. Một rating.</div>
+          </div>
+          <div class="title-art-wrap">
+            <div class="sticker sticker-one">VINTAGE<br />ENERGY</div>
+            <div class="sticker sticker-two">NO<br />REFUNDS</div>
+            <img class="title-art" src="./Assets/MkzMwz.png" alt="Artwork Thrifting 101" />
+            <div class="art-caption"><span>01</span><strong>THE STYLE<br />IS IN THE BAG</strong></div>
+          </div>
+        </div>
+        <div class="title-footer"><span>HTML REMAKE</span><span>ASSET-FAITHFUL BUILD</span><span>NO NEW ARTWORK</span></div>
+      </section>
+
+      <section class="screen" id="characterScreen" aria-labelledby="characterHeading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow accent-text">STEP 01 / PICK YOUR ENERGY</p>
+            <h2 id="characterHeading">Ai sẽ bước vào shop?</h2>
+          </div>
+          <span class="step-pill">01 / 04</span>
+        </div>
+        <p class="section-lead">Chọn một nhân vật để bắt đầu dựng look. Hover vào card để xem vibe.</p>
+        <div class="character-grid">
+          <button class="character-card character-left" type="button" data-gender="male">
+            <span class="character-number">01</span>
+            <span class="character-art crop-art crop-left"><img src="./Assets/MkzMwz.png" alt="Nhân vật Panda" /></span>
+            <span class="character-info"><strong>PANDA</strong><small>THE MAXIMALIST</small></span>
+            <span class="character-arrow">↗</span>
+          </button>
+          <button class="character-card character-right" type="button" data-gender="female">
+            <span class="character-number">02</span>
+            <span class="character-art crop-art crop-right"><img src="./Assets/MkzMwz.png" alt="Nhân vật Cvrix" /></span>
+            <span class="character-info"><strong>CVRIX</strong><small>THE CURATOR</small></span>
+            <span class="character-arrow">↗</span>
+          </button>
+        </div>
+        <div class="tip-line"><span class="tip-icon">✦</span> Hai nhân vật dùng cùng flow chọn đồ; khác nhau ở vibe của bộ look cuối.</div>
+      </section>
+
+      <section class="screen" id="shopScreen" aria-labelledby="shopHeading">
+        <div class="shop-toolbar">
+          <div>
+            <p class="eyebrow accent-text" id="stageEyebrow">STEP 02 / TOP HUNT</p>
+            <h2 id="shopHeading">Chọn món đồ để thử</h2>
+            <p class="toolbar-copy" id="stageCopy">Kéo một món vào model để thử ngay.</p>
+          </div>
+          <div class="shop-actions"><span class="look-progress" id="lookProgress">1 / 3</span><button class="pause-button" id="pauseButton" type="button">Ⅱ</button></div>
+        </div>
+
+        <div class="shop-layout">
+          <aside class="basket-panel fitting-panel" aria-label="Model thử đồ và giỏ đồ">
+            <div class="basket-topline"><span class="eyebrow">TRY-ON</span><span class="basket-count" id="basketCount">EMPTY</span></div>
+            <div class="basket-dropzone avatar-dropzone" id="basketDropzone">
+              <div class="three-viewport-slot" id="threeViewportSlot">
+                <div class="three-viewport" id="threeViewport" aria-label="Model 3D đang thử đồ">
+                  <canvas id="gameCanvas"></canvas>
+                  <div class="three-loading" id="threeLoading">LOADING MODEL...</div>
+                  <div class="three-badge">TRY-ON MODEL</div>
+                </div>
+              </div>
+              <div class="avatar-drop-copy"><strong>KÉO MÓN ĐỒ VÀO MODEL</strong><span>Thả vào đây để mặc ngay</span></div>
+              <div class="avatar-pose-tag">POSE / FIT CHECK</div>
+            </div>
+            <div class="basket-item basket-picked" id="basketItem">
+              <span class="basket-placeholder">Chưa chọn item</span>
+            </div>
+            <div class="stage-steps" id="stageSteps" aria-label="Tiến trình outfit">
+              <span data-stage-step="0" class="is-active">1 · ÁO</span><span data-stage-step="1">2 · QUẦN</span><span data-stage-step="2">3 · GIÀY</span>
+            </div>
+            <button class="primary-button continue-button" id="continueButton" type="button" disabled>Qua lượt quần <span>→</span></button>
+          </aside>
+          <div class="market-board" id="marketBoard">
+            <div class="market-strip"><span>OPEN RACKS / SINGLE ITEMS</span><span>DRAG TO TRY ON</span></div>
+            <div class="item-grid" id="itemGrid"></div>
+          </div>
+        </div>
+        <div class="toast" id="toast" role="status"></div>
+      </section>
+
+      <section class="screen" id="photoScreen" aria-labelledby="photoHeading">
+        <div class="photo-topline">
+          <div>
+            <p class="eyebrow accent-text">FINAL LOOK / PHOTO SESSION</p>
+            <h2 id="photoHeading">Fit check. Flash. Rating.</h2>
+          </div>
+          <div class="rating-lockup"><span>STYLE RANK</span><strong id="ratingText">SSS</strong></div>
+        </div>
+        <div class="photo-stage">
+          <div class="photo-three-slot" id="photoThreeSlot" aria-label="Nhân vật 3D trong ending"></div>
+          <div class="photo-copy">
+            <p class="eyebrow">THE LOOK YOU BUILT</p>
+            <h3 id="photoTitle">Một bộ đồ không thể bị lấy khỏi giỏ.</h3>
+            <p id="photoCopy">Ba góc máy, một chút drama và rất nhiều style.</p>
+            <div class="look-stack" id="lookStack"></div>
+            <p class="photo-auto-return" id="photoAutoReturn">Ảnh sẽ ẩn sau 5 giây. Scene sẽ tự quay về chọn nhân vật sau đó.</p>
+          </div>
+          <div class="photo-wall" id="photoWall"></div>
+          <div class="photo-flash" id="photoFlash"></div>
+        </div>
+      </section>
+    </main>
+
+    <div class="modal-backdrop" id="helpModal" hidden>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="helpHeading">
+        <button class="modal-close" id="closeHelpButton" type="button" aria-label="Đóng hướng dẫn">×</button>
+        <p class="eyebrow accent-text">QUICK BRIEF</p>
+        <h2 id="helpHeading">Cách chơi Thrifting 101</h2>
+        <ol class="help-list">
+          <li><span>01</span><div><strong>Chọn nhân vật</strong><small>Panda hoặc Cvrix, chọn vibe trước khi vào shop.</small></div></li>
+          <li><span>02</span><div><strong>Kéo item vào model</strong><small>Click không chọn; kéo áo, quần rồi giày vào model bên trái. Mỗi lượt chỉ giữ một món.</small></div></li>
+          <li><span>03</span><div><strong>Photo ending</strong><small>Ba flash, rating ngẫu nhiên SSS/B/S/F/A, ẩn ảnh rồi tự quay lại scene chọn nhân vật.</small></div></li>
+        </ol>
+        <button class="primary-button" id="modalStartButton" type="button" disabled>Vào shop <span>→</span></button>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="pauseModal" hidden>
+      <div class="modal-card pause-card" role="dialog" aria-modal="true" aria-labelledby="pauseHeading">
+        <p class="eyebrow accent-text">PAUSED</p>
+        <h2 id="pauseHeading">Giỏ vẫn ở đây.</h2>
+        <p>Nghỉ một nhịp rồi quay lại tiếp tục hoàn thiện outfit.</p>
+        <div class="modal-actions"><button class="primary-button" id="resumeButton" type="button">Tiếp tục <span>→</span></button><button class="ghost-button" id="restartButton" type="button">Về đầu</button></div>
+      </div>
+    </div>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+        }
+      }
+    </script>
+    <script src="./game.js" defer></script>
+    <script type="module" src="./game3d.js"></script>
+  </body>
+</html>
