@@ -106,13 +106,15 @@ const clothingFolders = {
 };
 
 const clothingFit = {
-  "top-check": { height: 1.34, y: 0.46, z: 0, x: 0 },
-  "top-racing": { height: 1.34, y: 0.46, z: 0, x: 0 },
-  "top-plaid": { height: 1.12, y: 0.46, z: 0, x: 0 },
-  "top-black": { height: 1.28, y: 0.46, z: 0, x: 0 },
-  "top-print": { height: 1.30, y: 0.46, z: 0, x: 0 },
-  "top-cobalt": { height: 1.42, y: 0.46, z: 0, x: 0 },
-  "top-ivory": { height: 1.34, y: 0.46, z: 0, x: 0 },
+  "top-check": { height: 1.34, y: 0.48, z: 0.18, x: 0.12 },
+  "top-racing": { height: 1.34, y: 0.48, z: 0.18, x: 0.12 },
+  "top-plaid": { height: 1.12, y: 0.52, z: 0.20, x: 0.12 },
+  "top-black": { height: 1.28, y: 0.48, z: 0.18, x: 0.12 },
+  // The pink Top 7 mesh sits behind the male torso at the default depth.
+  // Bring it slightly forward while keeping its centre on the chest.
+  "top-print": { height: 1.30, y: 0.52, z: 0.34, x: 0.12 },
+  "top-cobalt": { height: 1.42, y: 0.50, z: 0.20, x: 0.24 },
+  "top-ivory": { height: 1.34, y: 0.48, z: 0.18, x: 0.12 },
 };
 
 class ThreeShop {
@@ -898,9 +900,9 @@ class ThreeShop {
       shoes: this.bodyRegionBounds("shoes", characterBox, characterSize, characterCenter),
     };
     const offsets = {
-      top: { height: 1.25, y: 0.46, z: 0, x: 0 },
-      bottom: { height: 1.05, y: 0.12, z: 0, x: 0 },
-      shoes: { height: 0.32, y: 0.015, z: 0, x: 0 },
+      top: { height: 1.25, y: 0.48, z: 0.18 },
+      bottom: { height: 1.05, y: 0.30, z: 0.06 },
+      shoes: { height: 0.38, y: 0.025, z: 0.04 },
     };
     const currentItems = [...items];
     await Promise.all(currentItems.map(async (item) => {
@@ -914,7 +916,14 @@ class ThreeShop {
         object.rotation.x = 0;
         object.rotation.y = 0;
         const baseFit = clothingFit[item.id] || offsets[slot];
-        const fit = baseFit;
+        const fit = this.characterKind === "female"
+          ? {
+              ...baseFit,
+              x: 0,
+              y: slot === "top" ? 0.46 : slot === "bottom" ? 0.18 : 0.055,
+              z: 0,
+            }
+          : baseFit;
         this.fitHeight(object, fit.height / characterScale);
         if (buildId !== this.outfitBuildId || !this.character) return;
         const worldAnchor = new THREE.Vector3(
@@ -925,15 +934,31 @@ class ThreeShop {
         const localAnchor = this.character.worldToLocal(worldAnchor);
         object.position.add(localAnchor);
         this.outfitGroup.add(object);
-        this.autoFitClothing(
-          object,
-          slot,
-          fit,
-          characterBox,
-          characterSize,
-          characterCenter,
-          bodyRegions[slot],
-        );
+        if (this.characterKind !== "male") {
+          this.autoFitClothing(
+            object,
+            slot,
+            fit,
+            characterBox,
+            characterSize,
+            characterCenter,
+            bodyRegions[slot],
+          );
+          if (this.characterKind === "female" && slot === "shoes") {
+            // Shoe FBXs have inconsistent pivots. Anchor the pair to the feet.
+            object.updateMatrixWorld(true);
+            const shoeBox = new THREE.Box3().setFromObject(object);
+            const shoeSize = shoeBox.getSize(new THREE.Vector3());
+            const shoeCenter = shoeBox.getCenter(new THREE.Vector3());
+            const shoeTarget = new THREE.Vector3(
+              characterCenter.x,
+              characterBox.min.y + characterSize.y * 0.14 + shoeSize.y / 2,
+              characterBox.max.z + 0.14 + shoeSize.z / 2,
+            );
+            this.moveObjectWorld(object, shoeTarget.sub(shoeCenter));
+            object.updateMatrixWorld(true);
+          }
+        }
         const centeredPivot = this.centerClothingPivot(object);
         this.clothingObjects.set(item.id, centeredPivot);
         this.clothingBases.set(item.id, this.serializeTransform(centeredPivot));
