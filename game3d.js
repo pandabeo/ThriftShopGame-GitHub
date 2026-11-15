@@ -151,7 +151,9 @@ class ThreeShop {
     this.characterPreviewRenderer = null;
     this.characterPreviewViews = [];
     this.characterPreviewSize = { width: 0, height: 0 };
+    this.characterPositionOffset = { x: 0, y: 0, z: 0 };
     this.calibrationPresets = this.readCalibrationPresets();
+    this.characterPositionBase = new THREE.Vector3();
     this.rotatePointer = null;
     this.preparationPromises = new Map();
     this.mode = "shop";
@@ -261,7 +263,7 @@ class ThreeShop {
 
   async loadBundledCalibrationPresets() {
     if (this.bundledPresetsLoaded) return;
-    if (this.calibrationPresetVersion === 8 && Object.keys(this.calibrationPresets).length) {
+    if (this.calibrationPresetVersion === 9 && Object.keys(this.calibrationPresets).length) {
       this.bundledPresetsLoaded = true;
       return;
     }
@@ -269,10 +271,11 @@ class ThreeShop {
       const response = await fetch("./fit-presets.json", { cache: "no-cache" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
-      if (data.version === 8 && data.items && typeof data.items === "object") {
+      if (data.version === 9 && data.items && typeof data.items === "object") {
         this.calibrationPresets = { ...this.calibrationPresets, ...data.items };
-        localStorage.setItem("thrifting101-fit-presets", JSON.stringify({ version: 8, items: this.calibrationPresets }));
-        this.calibrationPresetVersion = 8;
+        if (data.characterPosition) this.characterPositionOffset = { ...this.characterPositionOffset, ...data.characterPosition };
+        localStorage.setItem("thrifting101-fit-presets", JSON.stringify({ version: 9, items: this.calibrationPresets, characterPosition: this.characterPositionOffset }));
+        this.calibrationPresetVersion = 9;
       }
     } catch (error) {
       console.warn("Bundled clothing preset failed to load", error);
@@ -608,6 +611,8 @@ class ThreeShop {
       this.fitHeight(this.character, 3.65);
       this.character.position.y += -1.36;
       this.character.position.z += this.actorZ;
+      this.characterPositionBase.copy(this.character.position);
+      this.applyCharacterPositionOffset();
       this.scene.add(this.character);
       this.character.add(this.auraLight);
       this.auraLight.position.set(0, 1.7, 0.45);
@@ -761,8 +766,32 @@ class ThreeShop {
     try {
       const parsed = JSON.parse(localStorage.getItem("thrifting101-fit-presets") || "{}");
       this.calibrationPresetVersion = parsed?.version;
-      return parsed && [4, 5, 6, 7, 8].includes(parsed.version) && parsed.items ? parsed.items : {};
+      if (parsed?.characterPosition && ["x", "y", "z"].every((axis) => Number.isFinite(parsed.characterPosition[axis]))) {
+        this.characterPositionOffset = { ...parsed.characterPosition };
+      }
+      return parsed && [4, 5, 6, 7, 8, 9].includes(parsed.version) && parsed.items ? parsed.items : {};
     } catch { return {}; }
+  }
+
+  getCharacterPositionOffset() {
+    return { ...this.characterPositionOffset };
+  }
+
+  applyCharacterPositionOffset(position = this.characterPositionOffset) {
+    const next = Object.fromEntries(["x", "y", "z"].map((axis) => [
+      axis,
+      Number.isFinite(position?.[axis]) ? position[axis] : 0,
+    ]));
+    this.characterPositionOffset = next;
+    if (this.character) {
+      this.character.position.set(
+        this.characterPositionBase.x + next.x,
+        this.characterPositionBase.y + next.y,
+        this.characterPositionBase.z + next.z,
+      );
+      this.character.updateMatrixWorld(true);
+    }
+    return next;
   }
 
   clothingIds() {
@@ -811,13 +840,13 @@ class ThreeShop {
     const transform = this.calibrationTransform(id);
     if (!transform) return false;
     this.calibrationPresets[this.calibrationKey(id)] = transform;
-    localStorage.setItem("thrifting101-fit-presets", JSON.stringify({ version: 8, items: this.calibrationPresets }));
-    this.calibrationPresetVersion = 8;
+    localStorage.setItem("thrifting101-fit-presets", JSON.stringify({ version: 9, items: this.calibrationPresets, characterPosition: this.characterPositionOffset }));
+    this.calibrationPresetVersion = 9;
     return true;
   }
 
   importCalibrationPresets(data) {
-    if (!data || ![2, 3, 4, 5, 6, 7, 8].includes(data.version) || !data.items || typeof data.items !== "object") throw new Error("File preset không đúng phiên bản workspace.");
+    if (!data || ![2, 3, 4, 5, 6, 7, 8, 9].includes(data.version) || !data.items || typeof data.items !== "object") throw new Error("File preset không đúng phiên bản workspace.");
     const allowed = new Set(this.clothingIds());
     for (const [key, value] of Object.entries(data.items)) {
       const [kind, id] = key.split(":");
@@ -825,12 +854,15 @@ class ThreeShop {
       if (!["position", "scale", "rotation"].every((part) => ["x", "y", "z"].every((axis) => Number.isFinite(value?.[part]?.[axis])))) continue;
       this.calibrationPresets[key] = value;
     }
-    localStorage.setItem("thrifting101-fit-presets", JSON.stringify({ version: 8, items: this.calibrationPresets }));
-    this.calibrationPresetVersion = 8;
+    if (data.characterPosition && ["x", "y", "z"].every((axis) => Number.isFinite(data.characterPosition[axis]))) {
+      this.applyCharacterPositionOffset(data.characterPosition);
+    }
+    localStorage.setItem("thrifting101-fit-presets", JSON.stringify({ version: 9, items: this.calibrationPresets, characterPosition: this.characterPositionOffset }));
+    this.calibrationPresetVersion = 9;
   }
 
   calibrationPresetFile() {
-    return { version: 8, app: "Thrifting 101 Fit Workspace", exportedAt: new Date().toISOString(), items: this.calibrationPresets };
+    return { version: 9, app: "Thrifting 101 Fit Workspace", exportedAt: new Date().toISOString(), characterPosition: this.characterPositionOffset, items: this.calibrationPresets };
   }
 
   itemSlot(id) {

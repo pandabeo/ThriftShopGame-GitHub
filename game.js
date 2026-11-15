@@ -604,6 +604,17 @@ function initializeFitWorkspace() {
   const itemSelect = $("#workspaceItem");
   const status = $("#workspaceStatus");
   const components = ["position", "scale", "rotation"];
+  const setCharacterPositionControls = (position) => {
+    if (!position) return;
+    for (const axis of ["x", "y", "z"]) {
+      const input = $(`[data-axis="character-position"] [data-component="${axis}"]`);
+      input.value = Number(position[axis] || 0).toFixed(3);
+    }
+  };
+  const currentCharacterPosition = () => Object.fromEntries(["x", "y", "z"].map((axis) => [
+    axis,
+    Number($(`[data-axis="character-position"] [data-component="${axis}"]`).value),
+  ]));
   const currentTransform = () => Object.fromEntries(components.map((part) => [part, Object.fromEntries(
     [...document.querySelectorAll(`[data-axis="${part}"] input`)].map((input) => [input.dataset.component, Number(input.value)]),
   )]));
@@ -640,6 +651,7 @@ function initializeFitWorkspace() {
     $("#pauseModal").hidden = true;
     preview.appendChild(viewport);
     await window.threeShop.setCharacter(characterSelect.value);
+    setCharacterPositionControls(window.threeShop.getCharacterPositionOffset());
     window.threeShop.setStage(currentStage);
     populateItems();
     await renderItem();
@@ -665,6 +677,10 @@ function initializeFitWorkspace() {
   });
   itemSelect.addEventListener("change", renderItem);
   for (const input of document.querySelectorAll(".axis-grid input")) input.addEventListener("input", () => {
+    if (input.closest(".axis-grid")?.dataset.axis === "character-position") {
+      window.threeShop.applyCharacterPositionOffset(currentCharacterPosition());
+      return;
+    }
     window.threeShop.updateCalibrationTransform(itemSelect.value, currentTransform());
   });
   let axisScrub = null;
@@ -700,7 +716,7 @@ function initializeFitWorkspace() {
   document.addEventListener("pointerup", stopAxisScrub);
   document.addEventListener("pointercancel", stopAxisScrub);
   $("#applyWorkspaceButton").addEventListener("click", () => {
-    if (window.threeShop.applyCalibration(itemSelect.value)) status.textContent = `Đã lưu ${itemSelect.value} cho ${characterSelect.value} trên trình duyệt này. Dùng Download preset để chuyển sang nơi khác.`;
+    if (window.threeShop.applyCalibration(itemSelect.value)) status.textContent = `Đã lưu vị trí nhân vật và outfit ${itemSelect.value} cho ${characterSelect.value} trên trình duyệt này. Dùng Download preset để chuyển sang nơi khác.`;
   });
   $("#downloadPresetButton").addEventListener("click", () => {
     const data = new Blob([JSON.stringify(window.threeShop.calibrationPresetFile(), null, 2)], { type: "application/json" });
@@ -716,6 +732,7 @@ function initializeFitWorkspace() {
     if (!file) return;
     try {
       window.threeShop.importCalibrationPresets(JSON.parse(await file.text()));
+      setCharacterPositionControls(window.threeShop.getCharacterPositionOffset());
       await renderItem();
       status.textContent = `Đã nhập preset ${file.name}.`;
     } catch (error) { status.textContent = error.message || "Không đọc được preset."; }
