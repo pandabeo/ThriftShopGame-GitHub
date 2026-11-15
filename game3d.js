@@ -364,6 +364,28 @@ class ThreeShop {
     return object;
   }
 
+  centerClothingPivot(object) {
+    object.updateMatrixWorld(true);
+    const parent = object.parent;
+    if (!parent) return object;
+    parent.updateMatrixWorld(true);
+    const worldMatrix = object.matrixWorld.clone();
+    const worldCenter = new THREE.Box3().setFromObject(object).getCenter(new THREE.Vector3());
+    const pivot = new THREE.Group();
+    pivot.name = `${object.name || "Clothing"}_CenteredPivot`;
+    pivot.position.copy(parent.worldToLocal(worldCenter));
+    parent.remove(object);
+    parent.add(pivot);
+    pivot.updateMatrixWorld(true);
+    pivot.add(object);
+    const centeredLocalMatrix = pivot.matrixWorld.clone().invert().multiply(worldMatrix);
+    centeredLocalMatrix.decompose(object.position, object.quaternion, object.scale);
+    object.matrixAutoUpdate = true;
+    object.updateMatrix();
+    pivot.updateMatrixWorld(true);
+    return pivot;
+  }
+
   bodyRegionBounds(slot, characterBox, characterSize, characterCenter) {
     const ranges = {
       top: [0.37, 0.72],
@@ -707,8 +729,9 @@ class ThreeShop {
             object.updateMatrixWorld(true);
           }
         }
-        this.clothingObjects.set(item.id, object);
-        this.clothingBases.set(item.id, this.serializeTransform(object));
+        const centeredPivot = this.centerClothingPivot(object);
+        this.clothingObjects.set(item.id, centeredPivot);
+        this.clothingBases.set(item.id, this.serializeTransform(centeredPivot));
         const savedTransform = this.calibrationPresets[this.calibrationKey(item.id)];
         if (savedTransform) this.updateCalibrationTransform(item.id, savedTransform);
       } catch (error) {
