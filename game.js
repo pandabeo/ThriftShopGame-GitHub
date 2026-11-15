@@ -558,8 +558,9 @@ function initializeFitWorkspace() {
         input,
         startX: event.clientX,
         startValue: Number(input.value) || 0,
-        step: Number(input.step) || 0.01,
-        decimals: (input.step.split(".")[1] || "").length,
+        step: 1.1,
+        min: input.min === "" ? Number.NEGATIVE_INFINITY : Number(input.min),
+        max: input.max === "" ? Number.POSITIVE_INFINITY : Number(input.max),
       };
       label.setPointerCapture(event.pointerId);
       event.preventDefault();
@@ -568,7 +569,8 @@ function initializeFitWorkspace() {
   document.addEventListener("pointermove", (event) => {
     if (!axisScrub) return;
     const steps = Math.round((event.clientX - axisScrub.startX) / 4);
-    axisScrub.input.value = (axisScrub.startValue + steps * axisScrub.step).toFixed(axisScrub.decimals);
+    const nextValue = Math.max(axisScrub.min, Math.min(axisScrub.max, axisScrub.startValue + steps * axisScrub.step));
+    axisScrub.input.value = nextValue.toFixed(1);
     axisScrub.input.dispatchEvent(new Event("input", { bubbles: true }));
     event.preventDefault();
   });
