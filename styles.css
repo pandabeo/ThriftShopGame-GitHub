@@ -166,7 +166,9 @@ button:focus-visible { outline: 3px solid var(--yellow); outline-offset: 3px; }
 .item-card.is-dragging { filter: none; transition: none; will-change: left, top, transform; }
 .item-card.is-in-basket { position: relative; width: 100%; height: 100%; min-height: 0; padding: 5px; border: 0; border-radius: 12px; background: rgba(255,255,255,.88); cursor: grab; }
 .item-card img { width: 100%; height: 100%; object-fit: contain; mix-blend-mode: multiply; filter: none; transition: .22s ease; pointer-events: none; }
+.item-card[data-image-crop="left"] img { clip-path: inset(0 50% 0 0); transform: scale(2); transform-origin: left center; }
 .item-card:hover img { transform: scale(1.08) rotate(3deg); }
+.item-card[data-image-crop="left"]:hover img { transform: scale(2.08) rotate(1deg); }
 
 .item-label { position: absolute; left: 2px; right: 2px; bottom: -3px; display: flex; justify-content: space-between; align-items: end; color: var(--ink); font-size: 10px; font-weight: 900; text-shadow: 0 1px 4px rgba(255,255,255,.9); }
 .item-label span:last-child { color: var(--blue); font-size: 9px; letter-spacing: .08em; }

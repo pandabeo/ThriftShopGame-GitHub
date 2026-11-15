@@ -106,15 +106,13 @@ const clothingFolders = {
 };
 
 const clothingFit = {
-  "top-check": { height: 1.34, y: 0.48, z: 0.18, x: 0.12 },
-  "top-racing": { height: 1.34, y: 0.48, z: 0.18, x: 0.12 },
-  "top-plaid": { height: 1.12, y: 0.52, z: 0.20, x: 0.12 },
-  "top-black": { height: 1.28, y: 0.48, z: 0.18, x: 0.12 },
-  // The pink Top 7 mesh sits behind the male torso at the default depth.
-  // Bring it slightly forward while keeping its centre on the chest.
-  "top-print": { height: 1.30, y: 0.52, z: 0.34, x: 0.12 },
-  "top-cobalt": { height: 1.42, y: 0.50, z: 0.20, x: 0.24 },
-  "top-ivory": { height: 1.34, y: 0.48, z: 0.18, x: 0.12 },
+  "top-check": { height: 1.34, y: 0.46, z: 0, x: 0 },
+  "top-racing": { height: 1.34, y: 0.46, z: 0, x: 0 },
+  "top-plaid": { height: 1.12, y: 0.46, z: 0, x: 0 },
+  "top-black": { height: 1.28, y: 0.46, z: 0, x: 0 },
+  "top-print": { height: 1.30, y: 0.46, z: 0, x: 0 },
+  "top-cobalt": { height: 1.42, y: 0.46, z: 0, x: 0 },
+  "top-ivory": { height: 1.34, y: 0.46, z: 0, x: 0 },
 };
 
 class ThreeShop {
@@ -263,7 +261,7 @@ class ThreeShop {
 
   async loadBundledCalibrationPresets() {
     if (this.bundledPresetsLoaded) return;
-    if (this.calibrationPresetVersion === 6 && Object.keys(this.calibrationPresets).length) {
+    if (this.calibrationPresetVersion === 7 && Object.keys(this.calibrationPresets).length) {
       this.bundledPresetsLoaded = true;
       return;
     }
@@ -271,10 +269,10 @@ class ThreeShop {
       const response = await fetch("./fit-presets.json", { cache: "no-cache" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
-      if (data.version === 6 && data.items && typeof data.items === "object") {
+      if (data.version === 7 && data.items && typeof data.items === "object") {
         this.calibrationPresets = { ...this.calibrationPresets, ...data.items };
-        localStorage.setItem("thrifting101-fit-presets", JSON.stringify({ version: 6, items: this.calibrationPresets }));
-        this.calibrationPresetVersion = 6;
+        localStorage.setItem("thrifting101-fit-presets", JSON.stringify({ version: 7, items: this.calibrationPresets }));
+        this.calibrationPresetVersion = 7;
       }
     } catch (error) {
       console.warn("Bundled clothing preset failed to load", error);
@@ -469,22 +467,29 @@ class ThreeShop {
         ? characterSize.x * 0.42
         : characterSize.x * 0.28;
     const bounds = new THREE.Box3();
-    let meshCount = 0;
+    let sampleCount = 0;
 
     this.character.traverse((child) => {
       if (!child.isMesh || !child.visible) return;
-      const meshBox = new THREE.Box3().setFromObject(child);
-      if (meshBox.isEmpty()) return;
-      const meshCenter = meshBox.getCenter(new THREE.Vector3());
-      if (meshCenter.y < minY || meshCenter.y > maxY) return;
-      if (slot !== "shoes" && Math.abs(meshCenter.x - characterCenter.x) > centerTolerance) return;
-      bounds.union(meshBox);
-      meshCount += 1;
+      const position = child.geometry?.attributes?.position;
+      if (!position?.count) return;
+      child.updateMatrixWorld(true);
+      const stride = Math.max(1, Math.floor(position.count / 2500));
+      const vertex = new THREE.Vector3();
+      for (let index = 0; index < position.count; index += stride) {
+        if (typeof child.getVertexPosition === "function") child.getVertexPosition(index, vertex);
+        else vertex.fromBufferAttribute(position, index);
+        vertex.applyMatrix4(child.matrixWorld);
+        if (vertex.y < minY || vertex.y > maxY) continue;
+        if (slot !== "shoes" && Math.abs(vertex.x - characterCenter.x) > centerTolerance) continue;
+        bounds.expandByPoint(vertex);
+        sampleCount += 1;
+      }
     });
 
     const minimumWidth = characterSize.x * (slot === "top" ? 0.34 : slot === "bottom" ? 0.30 : 0.18);
     const minimumDepth = characterSize.z * (slot === "shoes" ? 0.28 : 0.22);
-    if (!meshCount || bounds.isEmpty()) {
+    if (!sampleCount || bounds.isEmpty()) {
       bounds.min.set(
         characterCenter.x - minimumWidth / 2,
         minY,
@@ -525,10 +530,10 @@ class ThreeShop {
     const clearance = slot === "top" ? 0.055 : slot === "bottom" ? 0.045 : 0.025;
     const minScale = female
       ? slot === "top" ? 0.36 : slot === "bottom" ? 0.42 : 0.28
-      : slot === "top" ? 0.72 : slot === "bottom" ? 0.74 : 0.78;
+      : slot === "top" ? 0.42 : slot === "bottom" ? 0.42 : 0.42;
     const maxScale = female
       ? slot === "top" ? 0.96 : slot === "bottom" ? 1.02 : 0.80
-      : slot === "top" ? 1.16 : slot === "bottom" ? 1.14 : 1.10;
+      : slot === "top" ? 1.8 : slot === "bottom" ? 1.8 : 1.45;
     const targetSize = region.getSize(new THREE.Vector3());
     if (female) {
       // Cvrix is authored in a bent pose; the full body bounds include the
@@ -558,6 +563,9 @@ class ThreeShop {
       const heightScale = clothingSize.y > 0 ? targetSize.y / clothingSize.y : 1;
       object.scale.y *= Math.min(verticalMax, Math.max(verticalMin, heightScale));
       if (slot === "shoes") object.scale.multiplyScalar(0.55);
+    } else if (slot === "bottom") {
+      const heightScale = clothingSize.y > 0 ? targetSize.y / clothingSize.y : 1;
+      object.scale.y *= Math.min(1.35, Math.max(0.72, heightScale));
     }
 
     object.updateMatrixWorld(true);
@@ -565,9 +573,9 @@ class ThreeShop {
     const clothingCenter = clothingBox.getCenter(new THREE.Vector3());
     const regionCenter = region.getCenter(new THREE.Vector3());
     const targetCenter = new THREE.Vector3(
-      (female ? regionCenter.x : characterCenter.x + (fit.x || 0)),
+      regionCenter.x + (fit.x || 0),
       0,
-      (female ? regionCenter.z : characterCenter.z + (fit.z || 0)),
+      regionCenter.z + (fit.z || 0),
     );
     this.moveObjectWorld(object, new THREE.Vector3(
       targetCenter.x - clothingCenter.x,
@@ -753,7 +761,7 @@ class ThreeShop {
     try {
       const parsed = JSON.parse(localStorage.getItem("thrifting101-fit-presets") || "{}");
       this.calibrationPresetVersion = parsed?.version;
-      return parsed && [4, 5, 6].includes(parsed.version) && parsed.items ? parsed.items : {};
+      return parsed && [4, 5, 6, 7].includes(parsed.version) && parsed.items ? parsed.items : {};
     } catch { return {}; }
   }
 
@@ -803,13 +811,13 @@ class ThreeShop {
     const transform = this.calibrationTransform(id);
     if (!transform) return false;
     this.calibrationPresets[this.calibrationKey(id)] = transform;
-    localStorage.setItem("thrifting101-fit-presets", JSON.stringify({ version: 6, items: this.calibrationPresets }));
-    this.calibrationPresetVersion = 6;
+    localStorage.setItem("thrifting101-fit-presets", JSON.stringify({ version: 7, items: this.calibrationPresets }));
+    this.calibrationPresetVersion = 7;
     return true;
   }
 
   importCalibrationPresets(data) {
-    if (!data || ![2, 3, 4, 5, 6].includes(data.version) || !data.items || typeof data.items !== "object") throw new Error("File preset không đúng phiên bản workspace.");
+    if (!data || ![2, 3, 4, 5, 6, 7].includes(data.version) || !data.items || typeof data.items !== "object") throw new Error("File preset không đúng phiên bản workspace.");
     const allowed = new Set(this.clothingIds());
     for (const [key, value] of Object.entries(data.items)) {
       const [kind, id] = key.split(":");
@@ -817,12 +825,12 @@ class ThreeShop {
       if (!["position", "scale", "rotation"].every((part) => ["x", "y", "z"].every((axis) => Number.isFinite(value?.[part]?.[axis])))) continue;
       this.calibrationPresets[key] = value;
     }
-    localStorage.setItem("thrifting101-fit-presets", JSON.stringify({ version: 6, items: this.calibrationPresets }));
-    this.calibrationPresetVersion = 6;
+    localStorage.setItem("thrifting101-fit-presets", JSON.stringify({ version: 7, items: this.calibrationPresets }));
+    this.calibrationPresetVersion = 7;
   }
 
   calibrationPresetFile() {
-    return { version: 6, app: "Thrifting 101 Fit Workspace", exportedAt: new Date().toISOString(), items: this.calibrationPresets };
+    return { version: 7, app: "Thrifting 101 Fit Workspace", exportedAt: new Date().toISOString(), items: this.calibrationPresets };
   }
 
   itemSlot(id) {
@@ -846,7 +854,6 @@ class ThreeShop {
     this.clothingBases.clear();
     if (!this.character) return;
 
-    this.character.rotation.y = 0;
     this.character.updateMatrixWorld(true);
     const characterBox = new THREE.Box3().setFromObject(this.character);
     const characterSize = characterBox.getSize(new THREE.Vector3());
@@ -858,9 +865,9 @@ class ThreeShop {
       shoes: this.bodyRegionBounds("shoes", characterBox, characterSize, characterCenter),
     };
     const offsets = {
-      top: { height: 1.25, y: 0.48, z: 0.18 },
-      bottom: { height: 1.05, y: 0.30, z: 0.06 },
-      shoes: { height: 0.38, y: 0.025, z: 0.04 },
+      top: { height: 1.25, y: 0.46, z: 0, x: 0 },
+      bottom: { height: 1.05, y: 0.12, z: 0, x: 0 },
+      shoes: { height: 0.32, y: 0.015, z: 0, x: 0 },
     };
     const currentItems = [...items];
     await Promise.all(currentItems.map(async (item) => {
@@ -874,14 +881,7 @@ class ThreeShop {
         object.rotation.x = 0;
         object.rotation.y = 0;
         const baseFit = clothingFit[item.id] || offsets[slot];
-        const fit = this.characterKind === "female"
-          ? {
-              ...baseFit,
-              x: 0,
-              y: slot === "top" ? 0.46 : slot === "bottom" ? 0.18 : 0.055,
-              z: 0,
-            }
-          : baseFit;
+        const fit = baseFit;
         this.fitHeight(object, fit.height / characterScale);
         if (buildId !== this.outfitBuildId || !this.character) return;
         const worldAnchor = new THREE.Vector3(
@@ -892,36 +892,15 @@ class ThreeShop {
         const localAnchor = this.character.worldToLocal(worldAnchor);
         object.position.add(localAnchor);
         this.outfitGroup.add(object);
-        // Panda's supplied male FBX is a stylised side-pose with clothing
-        // meshes authored to the same pose. Keep its authored proportions;
-        // the generic body-box fitter is only used for Cvrix's neutral pose.
-        if (this.characterKind !== "male") {
-          this.autoFitClothing(
-            object,
-            slot,
-            fit,
-            characterBox,
-            characterSize,
-            characterCenter,
-            bodyRegions[slot],
-          );
-          if (this.characterKind === "female" && slot === "shoes") {
-            // Shoe FBXs have inconsistent pivots.  Anchor the complete pair
-            // from its measured box to the female feet instead of trusting
-            // the imported origin, which can otherwise leave it underground.
-            object.updateMatrixWorld(true);
-            const shoeBox = new THREE.Box3().setFromObject(object);
-            const shoeSize = shoeBox.getSize(new THREE.Vector3());
-            const shoeCenter = shoeBox.getCenter(new THREE.Vector3());
-            const shoeTarget = new THREE.Vector3(
-              characterCenter.x,
-              characterBox.min.y + characterSize.y * 0.14 + shoeSize.y / 2,
-              characterBox.max.z + 0.14 + shoeSize.z / 2,
-            );
-            this.moveObjectWorld(object, shoeTarget.sub(shoeCenter));
-            object.updateMatrixWorld(true);
-          }
-        }
+        this.autoFitClothing(
+          object,
+          slot,
+          fit,
+          characterBox,
+          characterSize,
+          characterCenter,
+          bodyRegions[slot],
+        );
         const centeredPivot = this.centerClothingPivot(object);
         this.clothingObjects.set(item.id, centeredPivot);
         this.clothingBases.set(item.id, this.serializeTransform(centeredPivot));

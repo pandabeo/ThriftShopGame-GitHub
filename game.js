@@ -21,10 +21,10 @@ const stages = [
     items: [
       { id: "top-check", name: "Top 1", tag: "TOP / 01", image: "Clothes Model/Clothes Material/20231205_Ucs1K6DbF5.jpeg" },
       { id: "top-racing", name: "Top 2", tag: "TOP / 02", image: "Clothes Model/Bơ Bơ Rỳ - Trước.png" },
-      { id: "top-plaid", name: "Top 3", tag: "TOP / 03", image: "Clothes Model/Clothes Material/O1CN014NIiF02Bx5MgFBylZ_134348404-2.jpg" },
+      { id: "top-plaid", name: "Top 3", tag: "TOP / 03", image: "Clothes Model/Clothes Material/O1CN014NIiF02Bx5MgFBylZ_134348404-2.jpg", imageCrop: "left" },
       { id: "top-black", name: "Top 6", tag: "TOP / 05", image: "Clothes Model/Clothes Material/shopee-2000-x-2500-px-33.jpg" },
       { id: "top-print", name: "Top 7", tag: "TOP / 06", image: "Clothes Model/Clothes Material/ao-bodysuit-khong-tay-co-lo-hong-u2l76_3df2aabedada4268a7330f7a7465df84_master.png" },
-      { id: "top-cobalt", name: "Top 8", tag: "TOP / 07", image: "Clothes Model/Clothes Material/Thiết-kế-và-in-áo-lớp-Galaxy-1.jpg", femaleImage: "Clothes Model/Clothes Material/vn-11134207-7qukw-lk8aghei0xbo2b.jpg" },
+      { id: "top-cobalt", name: "Top 8", tag: "TOP / 07", image: "Clothes Model/Clothes Material/Thiết-kế-và-in-áo-lớp-Galaxy-1.jpg", imageCrop: "left", femaleImage: "Clothes Model/Clothes Material/vn-11134207-7qukw-lk8aghei0xbo2b.jpg" },
       { id: "top-ivory", name: "Top 9", tag: "TOP / 08", image: "Clothes Model/Clothes Material/6148O7PbJWL._UY1100_.jpg" },
     ],
   },
@@ -72,6 +72,11 @@ let threeReady = false;
 let threeUiReady = false;
 let characterLoading = false;
 let workspaceOpen = false;
+const rackPositionStorageKey = "thrifting101-rack-positions";
+const rackPositions = new Map(Object.entries((() => {
+  try { return JSON.parse(localStorage.getItem(rackPositionStorageKey) || "{}"); }
+  catch { return {}; }
+})()));
 
 const sounds = {
   menu: "SFX (1)/Menu BGM.mp3",
@@ -251,6 +256,67 @@ function itemImage(item) {
   return selectedCharacter === "CVRIX" && item.femaleImage ? item.femaleImage : item.image;
 }
 
+function removeRackImageBackground(image) {
+  if (!image || image.dataset.cutoutReady) return;
+  const createCutout = () => {
+    if (image.dataset.cutoutReady || !image.naturalWidth || !image.naturalHeight) return;
+    image.dataset.cutoutReady = "true";
+    const maxDimension = 640;
+    const ratio = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
+    const width = Math.max(1, Math.round(image.naturalWidth * ratio));
+    const height = Math.max(1, Math.round(image.naturalHeight * ratio));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) return;
+    context.drawImage(image, 0, 0, width, height);
+    const pixels = context.getImageData(0, 0, width, height);
+    const { data } = pixels;
+    const size = width * height;
+    const visited = new Uint8Array(size);
+    const queue = new Int32Array(size);
+    let read = 0;
+    let write = 0;
+    const isBackground = (index) => {
+      const offset = index * 4;
+      const red = data[offset];
+      const green = data[offset + 1];
+      const blue = data[offset + 2];
+      return data[offset + 3] > 0 && Math.min(red, green, blue) >= 218 && Math.max(red, green, blue) - Math.min(red, green, blue) <= 38;
+    };
+    const addBackgroundPixel = (index) => {
+      if (visited[index]) return;
+      visited[index] = 1;
+      if (isBackground(index)) queue[write++] = index;
+    };
+    for (let x = 0; x < width; x += 1) {
+      addBackgroundPixel(x);
+      addBackgroundPixel((height - 1) * width + x);
+    }
+    for (let y = 0; y < height; y += 1) {
+      addBackgroundPixel(y * width);
+      addBackgroundPixel(y * width + width - 1);
+    }
+    while (read < write) {
+      const index = queue[read++];
+      data[index * 4 + 3] = 0;
+      const x = index % width;
+      const y = Math.floor(index / width);
+      if (x > 0) addBackgroundPixel(index - 1);
+      if (x + 1 < width) addBackgroundPixel(index + 1);
+      if (y > 0) addBackgroundPixel(index - width);
+      if (y + 1 < height) addBackgroundPixel(index + width);
+    }
+    if (write > 0) {
+      context.putImageData(pixels, 0, 0);
+      image.src = canvas.toDataURL("image/png");
+    }
+  };
+  if (image.complete) createCutout();
+  else image.addEventListener("load", createCutout, { once: true });
+}
+
 function renderBasket() {
   const item = chosen[currentSlot()];
   const basket = $("#basketItem");
@@ -264,7 +330,14 @@ function renderBasket() {
 
 function clamp(value, min, max) { return Math.min(max, Math.max(min, value)); }
 
-function restoreCardToGrid(card, nearBasket = false) {
+function saveRackPosition(itemId, position) {
+  if (!itemId || !Number.isFinite(position.x) || !Number.isFinite(position.y)) return;
+  rackPositions.set(itemId, position);
+  try { localStorage.setItem(rackPositionStorageKey, JSON.stringify(Object.fromEntries(rackPositions))); }
+  catch { /* Keep the position for this session if browser storage is unavailable. */ }
+}
+
+function restoreCardToGrid(card, position = null) {
   const grid = $("#itemGrid");
   if (!card || !grid) return;
   if (card.parentElement !== grid) grid.appendChild(card);
@@ -275,17 +348,20 @@ function restoreCardToGrid(card, nearBasket = false) {
   const cardRect = card.getBoundingClientRect();
   const maxX = Math.max(0, gridRect.width - cardRect.width);
   const maxY = Math.max(0, gridRect.height - cardRect.height);
-  const source = nearBasket ? { x: maxX * 0.72, y: maxY * 0.72 } : { x: Math.random() * maxX, y: Math.random() * maxY };
-  card.style.left = `${clamp(source.x, 0, maxX)}px`;
-  card.style.top = `${clamp(source.y, 0, maxY)}px`;
-  card.style.transform = `rotate(${card.dataset.rotation || 0}deg)`;
+  const saved = position || rackPositions.get(card.dataset.itemId) || { x: Math.random() * maxX, y: Math.random() * maxY, rotation: 0 };
+  const next = { x: clamp(saved.x, 0, maxX), y: clamp(saved.y, 0, maxY), rotation: Number(saved.rotation) || 0 };
+  card.style.left = `${next.x}px`;
+  card.style.top = `${next.y}px`;
+  card.dataset.rotation = next.rotation;
+  card.style.transform = `rotate(${next.rotation}deg)`;
+  saveRackPosition(card.dataset.itemId, next);
 }
 
 function detachBasketCard() {
   const card = $("#basketItem").querySelector(".item-card");
   if (!card) return null;
   chosen[currentSlot()] = null;
-  restoreCardToGrid(card, true);
+  restoreCardToGrid(card);
   renderBasket();
   syncThreeScene();
   return card;
@@ -297,7 +373,7 @@ function placeCardInBasket(card) {
   if (!item) return;
   const basket = $("#basketItem");
   const oldCard = basket.querySelector(".item-card");
-  if (oldCard && oldCard !== card) restoreCardToGrid(oldCard, true);
+  if (oldCard && oldCard !== card) restoreCardToGrid(oldCard);
   basket.innerHTML = "";
   basket.appendChild(card);
   card.classList.remove("is-dragging");
@@ -366,7 +442,7 @@ function moveCardDrag(event) {
 
 function endCardDrag(event) {
   if (!dragState || event.pointerId !== dragState.pointerId) return;
-  const { card, moved } = dragState;
+  const { card, moved, offsetX, offsetY } = dragState;
   const overBasket = isInside($("#basketDropzone").getBoundingClientRect(), event.clientX, event.clientY);
   const overSlot = isInside($("#basketItem").getBoundingClientRect(), event.clientX, event.clientY);
   $("#basketDropzone").classList.remove("is-over");
@@ -379,12 +455,22 @@ function endCardDrag(event) {
   } else {
     window.threeShop?.clearOutfitPreview();
     window.threeShop?.setTryOnFocus(false);
-    restoreCardToGrid(card, false);
+    if (isInside($("#marketBoard").getBoundingClientRect(), event.clientX, event.clientY)) {
+      const gridRect = $("#itemGrid").getBoundingClientRect();
+      const maxX = Math.max(0, gridRect.width - card.offsetWidth);
+      const maxY = Math.max(0, gridRect.height - card.offsetHeight);
+      restoreCardToGrid(card, {
+        x: clamp(event.clientX - offsetX - gridRect.left, 0, maxX),
+        y: clamp(event.clientY - offsetY - gridRect.top, 0, maxY),
+        rotation: 0,
+      });
+    } else restoreCardToGrid(card);
     if (!moved) playSfx("click");
   }
 }
 
 function bindCard(card) {
+  removeRackImageBackground(card.querySelector("img"));
   card.addEventListener("pointerdown", startCardDrag);
   card.addEventListener("pointerenter", () => playSfx("hover"));
 }
@@ -400,15 +486,31 @@ function layoutItemCards() {
   const horizontalGap = columns > 1 ? Math.max(12, (gridRect.width - columns * cardWidth) / (columns - 1)) : 0;
   const verticalGap = Math.min(24, Math.max(12, (gridRect.height - Math.ceil(cards.length / columns) * cardHeight) / Math.max(1, Math.ceil(cards.length / columns) - 1)));
   cards.forEach((card, index) => {
-    const column = index % columns;
-    const row = Math.floor(index / columns);
     const maxX = Math.max(0, gridRect.width - card.offsetWidth);
     const maxY = Math.max(0, gridRect.height - card.offsetHeight);
+    const saved = rackPositions.get(card.dataset.itemId);
+    if (saved) {
+      const next = { x: clamp(saved.x, 0, maxX), y: clamp(saved.y, 0, maxY), rotation: Number(saved.rotation) || 0 };
+      card.style.left = `${next.x}px`;
+      card.style.top = `${next.y}px`;
+      card.dataset.rotation = next.rotation;
+      card.style.transform = `rotate(${next.rotation}deg)`;
+      saveRackPosition(card.dataset.itemId, next);
+      return;
+    }
+    const column = index % columns;
+    const row = Math.floor(index / columns);
     const rotation = Math.round(-6 + Math.random() * 12);
+    const next = {
+      x: clamp(column * (cardWidth + horizontalGap), 0, maxX),
+      y: clamp(row * (cardHeight + verticalGap), 0, maxY),
+      rotation,
+    };
     card.dataset.rotation = rotation;
-    card.style.left = `${clamp(column * (cardWidth + horizontalGap), 0, maxX)}px`;
-    card.style.top = `${clamp(row * (cardHeight + verticalGap), 0, maxY)}px`;
+    card.style.left = `${next.x}px`;
+    card.style.top = `${next.y}px`;
     card.style.transform = `rotate(${rotation}deg)`;
+    saveRackPosition(card.dataset.itemId, next);
   });
 }
 
@@ -427,7 +529,7 @@ function renderShop() {
   const grid = $("#itemGrid");
   clearBasketForStage();
   grid.innerHTML = currentItems().map((item) => `
-    <article class="item-card" data-item-id="${item.id}" aria-label="${item.name}">
+    <article class="item-card" data-item-id="${item.id}" data-image-crop="${item.imageCrop || "none"}" aria-label="${item.name}">
       <img src="${ASSET(itemImage(item))}" alt="${item.name}" loading="lazy" draggable="false" />
       <div class="item-label"><span>${item.name}</span><span>${item.tag}</span></div>
     </article>
