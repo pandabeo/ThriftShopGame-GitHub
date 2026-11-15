@@ -1,7 +1,12 @@
 {
-  "version": 9,
+  "version": 10,
   "app": "Thrifting 101 Fit Workspace",
-  "source": "Imported outfit transforms with adjustable character position",
+  "source": "Default fit preset from thrifting101-fit-preset (3).json",
+  "characterPosition": {
+    "x": -1,
+    "y": 0,
+    "z": 0
+  },
   "items": {
     "male:top-check": {
       "position": {
@@ -377,10 +382,5 @@
         "z": 0
       }
     }
-  },
-  "characterPosition": {
-    "x": 0,
-    "y": 0,
-    "z": 0
   }
 }
