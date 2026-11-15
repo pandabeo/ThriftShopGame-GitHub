@@ -158,6 +158,8 @@ class ThreeShop {
     this.preparationPromises = new Map();
     this.mode = "shop";
     this.yaw = 0;
+    this.viewYaw = 0;
+    this.tryOnFocus = false;
     this.radius = 8.5;
     this.target = new THREE.Vector3(0, 1.25, 0);
     this.actorZ = 2.2;
@@ -628,8 +630,29 @@ class ThreeShop {
 
   setOutfit(items = []) {
     this.outfitItems = items;
+    this.previewingItem = null;
     this.setAuraForTop(items.find((item) => item.id.startsWith("top-")));
     return this.rebuildOutfit();
+  }
+
+  previewOutfitItem(item) {
+    if (!item || this.previewingItem?.id === item.id) return;
+    this.previewingItem = item;
+    const slot = this.itemSlot(item.id);
+    const previewItems = [...this.outfitItems.filter((current) => this.itemSlot(current.id) !== slot), item];
+    this.setAuraForTop(previewItems.find((current) => current.id.startsWith("top-")));
+    return this.rebuildOutfit(previewItems);
+  }
+
+  clearOutfitPreview() {
+    if (!this.previewingItem) return;
+    this.previewingItem = null;
+    this.setAuraForTop(this.outfitItems.find((item) => item.id.startsWith("top-")));
+    return this.rebuildOutfit(this.outfitItems);
+  }
+
+  setTryOnFocus(active) {
+    this.tryOnFocus = Boolean(active);
   }
 
   setAuraForTop(item) {
@@ -816,7 +839,7 @@ class ThreeShop {
     return `${clothingFolders[this.characterKind][slot]}${fileName}`;
   }
 
-  async rebuildOutfit() {
+  async rebuildOutfit(items = this.outfitItems) {
     const buildId = ++this.outfitBuildId;
     while (this.outfitGroup.children.length) this.outfitGroup.remove(this.outfitGroup.children[0]);
     this.clothingObjects.clear();
@@ -839,7 +862,7 @@ class ThreeShop {
       bottom: { height: 1.05, y: 0.30, z: 0.06 },
       shoes: { height: 0.38, y: 0.025, z: 0.04 },
     };
-    const currentItems = [...this.outfitItems];
+    const currentItems = [...items];
     await Promise.all(currentItems.map(async (item) => {
       const path = this.modelPathFor(item);
       if (!path) return;
@@ -923,13 +946,17 @@ class ThreeShop {
   animate() {
     requestAnimationFrame(() => this.animate());
     const delta = this.clock.getDelta();
-    this.yaw += delta * (this.mode === "photo" ? 0.02 : 0.012);
+    if (!this.tryOnFocus) this.yaw += delta * (this.mode === "photo" ? 0.02 : 0.012);
+    this.viewYaw = THREE.MathUtils.damp(this.viewYaw, this.tryOnFocus ? 0 : this.yaw, 8, delta);
     const pitch = this.mode === "photo" ? 0.12 : 0.2;
-    const x = Math.sin(this.yaw) * this.radius;
-    const z = Math.cos(this.yaw) * this.radius;
+    const x = Math.sin(this.viewYaw) * this.radius;
+    const z = Math.cos(this.viewYaw) * this.radius;
     this.camera.position.set(x, this.target.y + this.radius * pitch, z);
     this.camera.lookAt(this.target);
-    if (this.character) this.character.rotation.y = Math.sin(this.clock.elapsedTime * 0.75) * 0.045;
+    if (this.character) {
+      const characterYaw = this.tryOnFocus ? 0 : Math.sin(this.clock.elapsedTime * 0.75) * 0.045;
+      this.character.rotation.y = THREE.MathUtils.damp(this.character.rotation.y, characterYaw, 8, delta);
+    }
     this.animateAura(this.clock.elapsedTime);
     this.renderer.render(this.scene, this.camera);
     this.renderCharacterPreviews();

@@ -353,6 +353,15 @@ function moveCardDrag(event) {
   const overSlot = isInside($("#basketItem").getBoundingClientRect(), event.clientX, event.clientY);
   $("#basketDropzone").classList.toggle("is-over", overAvatar);
   $("#basketItem").classList.toggle("is-over", overSlot);
+  const overTryOnTarget = overAvatar || overSlot;
+  const item = currentItems().find((candidate) => candidate.id === card.dataset.itemId);
+  const previewId = overTryOnTarget ? item?.id : null;
+  if (previewId !== dragState.previewId) {
+    dragState.previewId = previewId;
+    if (item && overTryOnTarget) window.threeShop?.previewOutfitItem(item);
+    else window.threeShop?.clearOutfitPreview();
+  }
+  window.threeShop?.setTryOnFocus(overTryOnTarget);
 }
 
 function endCardDrag(event) {
@@ -365,8 +374,11 @@ function endCardDrag(event) {
   card.releasePointerCapture?.(event.pointerId);
   dragState = null;
   if (overBasket || overSlot) {
+    window.threeShop?.setTryOnFocus(false);
     placeCardInBasket(card);
   } else {
+    window.threeShop?.clearOutfitPreview();
+    window.threeShop?.setTryOnFocus(false);
     restoreCardToGrid(card, false);
     if (!moved) playSfx("click");
   }
