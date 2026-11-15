@@ -358,6 +358,113 @@ class ThreeShop {
     return object;
   }
 
+  bodyRegionBounds(slot, characterBox, characterSize, characterCenter) {
+    const ranges = {
+      top: [0.37, 0.72],
+      bottom: [0.13, 0.47],
+      shoes: [0, 0.18],
+    };
+    const [minRatio, maxRatio] = ranges[slot] || ranges.top;
+    const minY = characterBox.min.y + characterSize.y * minRatio;
+    const maxY = characterBox.min.y + characterSize.y * maxRatio;
+    const centerTolerance = slot === "shoes"
+      ? characterSize.x * 0.7
+      : slot === "bottom"
+        ? characterSize.x * 0.42
+        : characterSize.x * 0.28;
+    const bounds = new THREE.Box3();
+    let meshCount = 0;
+
+    this.character.traverse((child) => {
+      if (!child.isMesh || !child.visible) return;
+      const meshBox = new THREE.Box3().setFromObject(child);
+      if (meshBox.isEmpty()) return;
+      const meshCenter = meshBox.getCenter(new THREE.Vector3());
+      if (meshCenter.y < minY || meshCenter.y > maxY) return;
+      if (slot !== "shoes" && Math.abs(meshCenter.x - characterCenter.x) > centerTolerance) return;
+      bounds.union(meshBox);
+      meshCount += 1;
+    });
+
+    const minimumWidth = characterSize.x * (slot === "top" ? 0.34 : slot === "bottom" ? 0.30 : 0.18);
+    const minimumDepth = characterSize.z * (slot === "shoes" ? 0.28 : 0.22);
+    if (!meshCount || bounds.isEmpty()) {
+      bounds.min.set(
+        characterCenter.x - minimumWidth / 2,
+        minY,
+        characterCenter.z - minimumDepth / 2,
+      );
+      bounds.max.set(
+        characterCenter.x + minimumWidth / 2,
+        maxY,
+        characterCenter.z + minimumDepth / 2,
+      );
+      return bounds;
+    }
+
+    const size = bounds.getSize(new THREE.Vector3());
+    const centerX = characterCenter.x;
+    const centerZ = bounds.getCenter(new THREE.Vector3()).z;
+    const width = Math.max(size.x, minimumWidth);
+    const depth = Math.max(size.z, minimumDepth);
+    bounds.min.x = centerX - width / 2;
+    bounds.max.x = centerX + width / 2;
+    bounds.min.z = centerZ - depth / 2;
+    bounds.max.z = centerZ + depth / 2;
+    return bounds;
+  }
+
+  moveObjectWorld(object, delta) {
+    if (!object.parent) return;
+    const worldPosition = object.getWorldPosition(new THREE.Vector3()).add(delta);
+    object.position.copy(object.parent.worldToLocal(worldPosition));
+  }
+
+  autoFitClothing(object, slot, fit, characterBox, characterSize, characterCenter, region) {
+    const clearance = slot === "top" ? 0.055 : slot === "bottom" ? 0.045 : 0.025;
+    const minScale = slot === "top" ? 0.72 : slot === "bottom" ? 0.74 : 0.78;
+    const maxScale = slot === "top" ? 1.16 : slot === "bottom" ? 1.14 : 1.10;
+    const targetSize = region.getSize(new THREE.Vector3());
+
+    object.updateMatrixWorld(true);
+    let clothingBox = new THREE.Box3().setFromObject(object);
+    const clothingSize = clothingBox.getSize(new THREE.Vector3());
+    const widthScale = clothingSize.x > 0
+      ? (targetSize.x + clearance * 2) / clothingSize.x
+      : 1;
+    const depthScale = clothingSize.z > 0
+      ? (targetSize.z + clearance * 2) / clothingSize.z
+      : 1;
+    // Fit width and depth independently. This prevents bulky FBX meshes
+    // from swallowing the model while still leaving a small anti-clipping gap.
+    object.scale.x *= Math.min(maxScale, Math.max(minScale, widthScale));
+    object.scale.z *= Math.min(maxScale, Math.max(minScale, depthScale));
+
+    object.updateMatrixWorld(true);
+    clothingBox = new THREE.Box3().setFromObject(object);
+    const clothingCenter = clothingBox.getCenter(new THREE.Vector3());
+    const targetCenter = new THREE.Vector3(
+      characterCenter.x + (fit.x || 0),
+      0,
+      characterCenter.z + (fit.z || 0),
+    );
+    this.moveObjectWorld(object, new THREE.Vector3(
+      targetCenter.x - clothingCenter.x,
+      0,
+      targetCenter.z - clothingCenter.z,
+    ));
+
+    object.updateMatrixWorld(true);
+    clothingBox = new THREE.Box3().setFromObject(object);
+    const targetBottom = characterBox.min.y + characterSize.y * fit.y;
+    this.moveObjectWorld(object, new THREE.Vector3(0, targetBottom - clothingBox.min.y, 0));
+
+    object.updateMatrixWorld(true);
+    clothingBox = new THREE.Box3().setFromObject(object);
+    const frontGap = region.max.z + clearance - clothingBox.max.z;
+    if (frontGap > 0) this.moveObjectWorld(object, new THREE.Vector3(0, 0, frontGap));
+  }
+
   async setCharacter(kind) {
     if (!this.ready && this.characterKind === kind && this.character) return;
     if (this.character && this.characterKind === kind) return;
@@ -422,6 +529,11 @@ class ThreeShop {
     const characterSize = characterBox.getSize(new THREE.Vector3());
     const characterCenter = characterBox.getCenter(new THREE.Vector3());
     const characterScale = this.character.getWorldScale(new THREE.Vector3()).y || 1;
+    const bodyRegions = {
+      top: this.bodyRegionBounds("top", characterBox, characterSize, characterCenter),
+      bottom: this.bodyRegionBounds("bottom", characterBox, characterSize, characterCenter),
+      shoes: this.bodyRegionBounds("shoes", characterBox, characterSize, characterCenter),
+    };
     const offsets = {
       top: { height: 1.25, y: 0.48, z: 0.18 },
       bottom: { height: 1.05, y: 0.30, z: 0.06 },
@@ -448,6 +560,15 @@ class ThreeShop {
         const localAnchor = this.character.worldToLocal(worldAnchor);
         object.position.add(localAnchor);
         this.outfitGroup.add(object);
+        this.autoFitClothing(
+          object,
+          slot,
+          fit,
+          characterBox,
+          characterSize,
+          characterCenter,
+          bodyRegions[slot],
+        );
       } catch (error) {
         console.warn(`3D clothing asset failed: ${path}`, error);
       }
