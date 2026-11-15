@@ -64,28 +64,31 @@ const itemModels = {
     "top-racing": ["Top3.fbx", "m-top2.fbx"],
     "top-plaid": ["Top7.fbx", "m-top3.fbx"],
     "top-black": ["Top6.fbx", "m-top6.fbx"],
+    // The Top 7 card is the pink sleeveless piece; use the matching female mesh.
     "top-print": ["Top9.fbx", "m-top7.fbx"],
-    "top-cobalt": ["Top8.fbx", "m-top8.fbx"],
+    "top-cobalt": ["Top4.fbx", "m-top8.fbx"],
     "top-ivory": ["Top2.fbx", "m-top5.fbx"],
   },
   bottom: {
-    "bottom-banana": ["Bottom1.fbx", "m-bottom1.fbx"],
-    "bottom-banana-2": ["Bottom2.fbx", "m-bottom2.fbx"],
-    "bottom-cargo": ["Bottom3.fbx", "m-bottom3.fbx"],
-    "bottom-floral": ["Bottom4.fbx", "m-bottom4.fbx"],
-    "bottom-pants": ["Bottom5.fbx", "m-bottom5.fbx"],
-    "bottom-mix": ["Bottom6.fbx", "m-bottom6.fbx"],
-    "bottom-army": ["Bottom7.fbx", "m-bottom7.fbx"],
-    "bottom-cream": ["Bottom8.fbx", "m-bottom8.fbx"],
+    // Female meshes are matched by their embedded material image, not by
+    // the numeric FBX suffix.  The rack cards use the same source images.
+    "bottom-banana": ["Bottom3.fbx", "m-bottom1.fbx"],
+    "bottom-banana-2": ["Bottom1.fbx", "m-bottom2.fbx"],
+    "bottom-cargo": ["Bottom4.fbx", "m-bottom3.fbx"],
+    "bottom-floral": ["Bottom8.fbx", "m-bottom4.fbx"],
+    "bottom-pants": ["Bottom7.fbx", "m-bottom5.fbx"],
+    "bottom-mix": ["Bottom5.fbx", "m-bottom6.fbx"],
+    "bottom-army": ["Bottom2.fbx", "m-bottom7.fbx"],
+    "bottom-cream": ["Bottom6.fbx", "m-bottom8.fbx"],
   },
   shoes: {
-    "shoe-camel": ["Shoes1.fbx", "m-shoes1.fbx"],
-    "shoe-mix": ["Shoes2.fbx", "m-shoes2.fbx"],
-    "shoe-flats": ["Shoes3.fbx", "m-shoes3.fbx"],
-    "shoe-boots": ["Shoes4.fbx", "m-shoes4.fbx"],
-    "shoe-color": ["Shoes5.fbx", "m-shoes5.fbx"],
-    "shoe-vintage": ["Shoes6.fbx", "m-shoes6.fbx"],
-    "shoe-high": ["Shoes8.fbx", "m-shoes8.fbx"],
+    "shoe-camel": ["Shoes8.fbx", "m-shoes1.fbx"],
+    "shoe-mix": ["Shoes6.fbx", "m-shoes2.fbx"],
+    "shoe-flats": ["Shoes7.fbx", "m-shoes3.fbx"],
+    "shoe-boots": ["Shoes5.fbx", "m-shoes4.fbx"],
+    "shoe-color": ["Shoes4.fbx", "m-shoes5.fbx"],
+    "shoe-vintage": ["Shoes2.fbx", "m-shoes6.fbx"],
+    "shoe-high": ["Shoes3.fbx", "m-shoes8.fbx"],
   },
 };
 
@@ -403,8 +406,12 @@ class ThreeShop {
     }
 
     const size = bounds.getSize(new THREE.Vector3());
-    const centerX = characterCenter.x;
-    const centerZ = bounds.getCenter(new THREE.Vector3()).z;
+    // Keep the clothing centred on the actual body meshes in this vertical
+    // band.  Cvrix's raised arm makes the full-character bounding-box centre
+    // a poor anchor for tops and bottoms.
+    const bodyCenter = bounds.getCenter(new THREE.Vector3());
+    const centerX = bodyCenter.x;
+    const centerZ = bodyCenter.z;
     const width = Math.max(size.x, minimumWidth);
     const depth = Math.max(size.z, minimumDepth);
     bounds.min.x = centerX - width / 2;
@@ -421,10 +428,23 @@ class ThreeShop {
   }
 
   autoFitClothing(object, slot, fit, characterBox, characterSize, characterCenter, region) {
+    const female = this.characterKind === "female";
     const clearance = slot === "top" ? 0.055 : slot === "bottom" ? 0.045 : 0.025;
-    const minScale = slot === "top" ? 0.72 : slot === "bottom" ? 0.74 : 0.78;
-    const maxScale = slot === "top" ? 1.16 : slot === "bottom" ? 1.14 : 1.10;
+    const minScale = female
+      ? slot === "top" ? 0.36 : slot === "bottom" ? 0.42 : 0.28
+      : slot === "top" ? 0.72 : slot === "bottom" ? 0.74 : 0.78;
+    const maxScale = female
+      ? slot === "top" ? 0.96 : slot === "bottom" ? 1.02 : 0.80
+      : slot === "top" ? 1.16 : slot === "bottom" ? 1.14 : 1.10;
     const targetSize = region.getSize(new THREE.Vector3());
+    if (female) {
+      // Cvrix is authored in a bent pose; the full body bounds include the
+      // raised arm and make tops/ bottoms grow too wide. Fit to the torso and
+      // hips instead of the silhouette of the whole pose.
+      targetSize.x *= slot === "top" ? 0.44 : slot === "bottom" ? 0.94 : 0.35;
+      targetSize.y *= slot === "top" ? 0.90 : slot === "bottom" ? 0.86 : 0.35;
+      targetSize.z *= slot === "top" ? 0.64 : slot === "bottom" ? 0.70 : 0.28;
+    }
 
     object.updateMatrixWorld(true);
     let clothingBox = new THREE.Box3().setFromObject(object);
@@ -439,14 +459,22 @@ class ThreeShop {
     // from swallowing the model while still leaving a small anti-clipping gap.
     object.scale.x *= Math.min(maxScale, Math.max(minScale, widthScale));
     object.scale.z *= Math.min(maxScale, Math.max(minScale, depthScale));
+    if (female) {
+      const verticalMin = slot === "shoes" ? 0.30 : 0.48;
+      const verticalMax = slot === "shoes" ? 0.82 : 1.05;
+      const heightScale = clothingSize.y > 0 ? targetSize.y / clothingSize.y : 1;
+      object.scale.y *= Math.min(verticalMax, Math.max(verticalMin, heightScale));
+      if (slot === "shoes") object.scale.multiplyScalar(0.55);
+    }
 
     object.updateMatrixWorld(true);
     clothingBox = new THREE.Box3().setFromObject(object);
     const clothingCenter = clothingBox.getCenter(new THREE.Vector3());
+    const regionCenter = region.getCenter(new THREE.Vector3());
     const targetCenter = new THREE.Vector3(
-      characterCenter.x + (fit.x || 0),
+      (female ? regionCenter.x : characterCenter.x + (fit.x || 0)),
       0,
-      characterCenter.z + (fit.z || 0),
+      (female ? regionCenter.z : characterCenter.z + (fit.z || 0)),
     );
     this.moveObjectWorld(object, new THREE.Vector3(
       targetCenter.x - clothingCenter.x,
@@ -489,14 +517,16 @@ class ThreeShop {
 
   setStage(stageIndex) {
     this.mode = "shop";
-    this.target.set(0, 0.55, this.actorZ);
-    this.radius = 7.8 - stageIndex * 0.2;
+    const female = this.characterKind === "female";
+    this.target.set(0, female ? 0.22 : 0.55, this.actorZ);
+    this.radius = (female ? 8.6 : 7.8) - stageIndex * 0.2;
   }
 
   setPhotoMode(enabled) {
     this.mode = enabled ? "photo" : "shop";
-    this.target.set(0, 0.55, this.actorZ);
-    this.radius = enabled ? 6.3 : 7.8;
+    const female = this.characterKind === "female";
+    this.target.set(0, female ? 0.22 : 0.55, this.actorZ);
+    this.radius = enabled ? (female ? 6.9 : 6.3) : (female ? 8.6 : 7.8);
   }
 
   setOutfit(items = []) {
@@ -546,10 +576,19 @@ class ThreeShop {
       try {
         const template = await this.loadTemplate(path);
         const object = this.clone(template);
+        object.visible = true;
         const slot = this.itemSlot(item.id);
         object.rotation.x = 0;
         object.rotation.y = 0;
-        const fit = clothingFit[item.id] || offsets[slot];
+        const baseFit = clothingFit[item.id] || offsets[slot];
+        const fit = this.characterKind === "female"
+          ? {
+              ...baseFit,
+              x: 0,
+              y: slot === "top" ? 0.46 : slot === "bottom" ? 0.18 : 0.055,
+              z: 0,
+            }
+          : baseFit;
         this.fitHeight(object, fit.height / characterScale);
         if (buildId !== this.outfitBuildId || !this.character) return;
         const worldAnchor = new THREE.Vector3(
@@ -560,15 +599,36 @@ class ThreeShop {
         const localAnchor = this.character.worldToLocal(worldAnchor);
         object.position.add(localAnchor);
         this.outfitGroup.add(object);
-        this.autoFitClothing(
-          object,
-          slot,
-          fit,
-          characterBox,
-          characterSize,
-          characterCenter,
-          bodyRegions[slot],
-        );
+        // Panda's supplied male FBX is a stylised side-pose with clothing
+        // meshes authored to the same pose. Keep its authored proportions;
+        // the generic body-box fitter is only used for Cvrix's neutral pose.
+        if (this.characterKind !== "male") {
+          this.autoFitClothing(
+            object,
+            slot,
+            fit,
+            characterBox,
+            characterSize,
+            characterCenter,
+            bodyRegions[slot],
+          );
+          if (this.characterKind === "female" && slot === "shoes") {
+            // Shoe FBXs have inconsistent pivots.  Anchor the complete pair
+            // from its measured box to the female feet instead of trusting
+            // the imported origin, which can otherwise leave it underground.
+            object.updateMatrixWorld(true);
+            const shoeBox = new THREE.Box3().setFromObject(object);
+            const shoeSize = shoeBox.getSize(new THREE.Vector3());
+            const shoeCenter = shoeBox.getCenter(new THREE.Vector3());
+            const shoeTarget = new THREE.Vector3(
+              characterCenter.x,
+              characterBox.min.y + characterSize.y * 0.14 + shoeSize.y / 2,
+              characterBox.max.z + 0.14 + shoeSize.z / 2,
+            );
+            this.moveObjectWorld(object, shoeTarget.sub(shoeCenter));
+            object.updateMatrixWorld(true);
+          }
+        }
       } catch (error) {
         console.warn(`3D clothing asset failed: ${path}`, error);
       }
