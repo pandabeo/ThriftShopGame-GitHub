@@ -498,7 +498,7 @@ function initializeFitWorkspace() {
     await window.threeShop.setCalibrationItem(id);
     const transform = window.threeShop.calibrationTransform(id);
     if (transform) setControls(transform);
-    status.textContent = `${id} · ${characterSelect.value === "male" ? "Panda" : "Cvrix"}`;
+    status.textContent = `${id} · ${characterSelect.value === "male" ? "Panda" : "Cvrix"} · Lưu trên trình duyệt này`;
   };
   const populateItems = () => {
     const previous = itemSelect.value;
