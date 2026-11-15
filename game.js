@@ -547,6 +547,34 @@ function initializeFitWorkspace() {
   for (const input of document.querySelectorAll(".axis-grid input")) input.addEventListener("input", () => {
     window.threeShop.updateCalibrationTransform(itemSelect.value, currentTransform());
   });
+  let axisScrub = null;
+  for (const label of document.querySelectorAll(".axis-grid label")) {
+    label.title = "Giữ chuột và kéo trái/phải để chỉnh nhanh";
+    label.addEventListener("pointerdown", (event) => {
+      if (event.target.closest("input")) return;
+      const input = label.querySelector("input");
+      if (!input) return;
+      axisScrub = {
+        input,
+        startX: event.clientX,
+        startValue: Number(input.value) || 0,
+        step: Number(input.step) || 0.01,
+        decimals: (input.step.split(".")[1] || "").length,
+      };
+      label.setPointerCapture(event.pointerId);
+      event.preventDefault();
+    });
+  }
+  document.addEventListener("pointermove", (event) => {
+    if (!axisScrub) return;
+    const steps = Math.round((event.clientX - axisScrub.startX) / 4);
+    axisScrub.input.value = (axisScrub.startValue + steps * axisScrub.step).toFixed(axisScrub.decimals);
+    axisScrub.input.dispatchEvent(new Event("input", { bubbles: true }));
+    event.preventDefault();
+  });
+  const stopAxisScrub = () => { axisScrub = null; };
+  document.addEventListener("pointerup", stopAxisScrub);
+  document.addEventListener("pointercancel", stopAxisScrub);
   $("#applyWorkspaceButton").addEventListener("click", () => {
     if (window.threeShop.applyCalibration(itemSelect.value)) status.textContent = `Đã Apply và lưu ${itemSelect.value} cho ${characterSelect.value}.`;
   });
